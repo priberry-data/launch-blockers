@@ -2,6 +2,8 @@
 
 **The <!--n-->15<!--/n--> ways AI-built apps leak their users' data, each one on the public record, checked before you launch.**
 
+**[blockers.priberry.com](https://blockers.priberry.com)**
+
 Built your app with Lovable, Bolt, v0, Replit, Cursor or Claude Code? These are the mistakes behind the leaks in the news: open databases, keys in the browser, Firebase left in test mode. Every pattern links to a dated public incident or the platform's own rule, comes with a fix prompt you paste into your builder, and has a check that runs before you deploy. (<!--mix-->11 from dated incidents or studies, 4 from the platform's own rules<!--/mix-->.)
 
 ```text

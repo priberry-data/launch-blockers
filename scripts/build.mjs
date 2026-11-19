@@ -94,4 +94,14 @@ const SHORT = { scan: "scan", "agent-review": "agent review", "outside-check": "
 const table = ["| # | Pattern | Severity | Found by | On the record |", "|---|---|---|---|---|", ...patterns.map((p, i) => `| ${i + 1} | [${p.title}](PLAYBOOK.md#${i + 1}-${p.id}) | ${p.severity} | ${SHORT[p.detection]} | ${p.incidents[0] ? `${p.incidents[0].title} (${p.incidents[0].date.slice(0, 7)})` : `Rule: ${p.rules[0].source_name}`} |`)].join("\n");
 if (fs.existsSync(readme))
   fs.writeFileSync(readme, fs.readFileSync(readme, "utf8").replace(/<!--n-->\d+<!--\/n-->/g, `<!--n-->${N}<!--/n-->`).replace(/<!--mix-->[^<]*<!--\/mix-->/, `<!--mix-->${mix}<!--/mix-->`).replace(/<!--table-->[\s\S]*?<!--\/table-->/, `<!--table-->\n${table}\n<!--/table-->`));
+// The website: same count, same table, same version.
+const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const siteRows = patterns.map((p, i) => {
+  const src = p.incidents[0] ? { t: `${p.incidents[0].title} (${p.incidents[0].date.slice(0, 7)})`, u: p.incidents[0].source_url } : { t: `Rule: ${p.rules[0].source_name}`, u: p.rules[0].source_url };
+  return `<tr><td>${i + 1}</td><td><a href="https://github.com/priberry-data/launch-blockers/blob/main/PLAYBOOK.md#${i + 1}-${p.id}">${esc(p.title)}</a></td><td class="sev-${p.severity}">${p.severity}</td><td>${SHORT[p.detection]}</td><td><a href="${esc(src.u)}">${esc(src.t)}</a></td></tr>`;
+});
+const siteTable = `<table class="patterns"><thead><tr><th scope="col">#</th><th scope="col">pattern</th><th scope="col">severity</th><th scope="col">found by</th><th scope="col">on the record</th></tr></thead><tbody>\n${siteRows.join("\n")}\n</tbody></table>`;
+const sitePath = path.join(ROOT, "site", "index.html");
+if (fs.existsSync(sitePath))
+  fs.writeFileSync(sitePath, fs.readFileSync(sitePath, "utf8").replace(/<!--n-->\d+<!--\/n-->/g, `<!--n-->${N}<!--/n-->`).replace(/<!--v-->[^<]*<!--\/v-->/g, `<!--v-->${VERSION}<!--/v-->`).replace(/<!--mix-->[^<]*<!--\/mix-->/g, `<!--mix-->${mix}<!--/mix-->`).replace(/<!--patterns-->[\s\S]*?<!--\/patterns-->/, `<!--patterns-->\n${siteTable}\n<!--/patterns-->`));
 console.log(`built ${N} patterns: PLAYBOOK.md, skill/launch-blockers/SKILL.md, README count`);

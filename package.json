@@ -10,7 +10,7 @@
   "dependencies": { "greenlitlab": "0.4.4" },
   "license": "Apache-2.0",
   "keywords": ["vibe-coding", "security", "lovable", "bolt", "supabase", "firebase", "claude-code", "agent-skill", "pre-deploy", "checklist"],
-  "homepage": "https://github.com/priberry-data/launch-blockers",
+  "homepage": "https://blockers.priberry.com",
   "author": "Priberry",
   "repository": { "type": "git", "url": "git+https://github.com/priberry-data/launch-blockers.git" }
 }
