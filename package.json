@@ -1,0 +1,16 @@
+{
+  "name": "launch-blockers",
+  "version": "0.1.0",
+  "description": "The documented ways AI-built apps leak their users' data, each tied to a real incident, with a fix prompt, an agent skill that checks your project, and a guard that stops the deploy when it finds one.",
+  "type": "module",
+  "bin": { "launch-blockers": "bin/launch-blockers.mjs" },
+  "files": ["bin", "src", "data", "skill", "README.md", "PLAYBOOK.md", "LICENSE"],
+  "engines": { "node": ">=20" },
+  "scripts": { "build": "node scripts/build.mjs", "test": "node --test test/*.test.mjs" },
+  "dependencies": { "greenlitlab": "0.4.4" },
+  "license": "Apache-2.0",
+  "keywords": ["vibe-coding", "security", "lovable", "bolt", "supabase", "firebase", "claude-code", "agent-skill", "pre-deploy", "checklist"],
+  "homepage": "https://github.com/priberry-data/launch-blockers",
+  "author": "Priberry",
+  "repository": { "type": "git", "url": "git+https://github.com/priberry-data/launch-blockers.git" }
+}
