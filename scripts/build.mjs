@@ -51,7 +51,7 @@ Found a pattern with a public source that isn't here? Open an issue with the lin
 );
 
 // The agent skill
-const review = patterns.filter((p) => p.detection !== "scan");
+const review = patterns.filter((p) => p.detection === "agent-review");
 fs.mkdirSync(path.join(ROOT, "skill", "launch-blockers"), { recursive: true });
 fs.writeFileSync(
   path.join(ROOT, "skill", "launch-blockers", "SKILL.md"),
@@ -79,17 +79,19 @@ For each of these, do the check yourself by reading the code, and report a clear
 
 ${review.map((p, i) => `### 2.${i + 1} ${p.title}\n${p.why}\n\nWhat to do: ${p.fix_prompt}`).join("\n\n")}
 
-For the live database, don't run anything yourself: tell the user to run \`npx greenlitlab <their-app-url> --mine\` on their own app.
+## 3. The live app\nA file scan can't see the live database: rules changed in the Supabase or Firebase console never show up in files. Don't query the live database yourself. Tell the user to run \`npx greenlitlab <their-app-url> --mine\` on their own app; it counts which tables a stranger can read and never reads data.
 
-## 3. Report
+## 4. Report
 Finish with a short table: each of the ${N} patterns, and whether it's blocked, clear, not applicable or not checked. Put anything blocked first, with the fix you propose. End with one line: what still can't be checked from here.
 `,
 );
 
 // README count
 const readme = path.join(ROOT, "README.md");
+const withIncident = patterns.filter((p) => p.incidents.length).length;
+const mix = `${withIncident} from dated incidents or studies, ${N - withIncident} from the platform's own rules`;
 const SHORT = { scan: "scan", "agent-review": "agent review", "outside-check": "live check" };
 const table = ["| # | Pattern | Severity | Found by | On the record |", "|---|---|---|---|---|", ...patterns.map((p, i) => `| ${i + 1} | [${p.title}](PLAYBOOK.md#${i + 1}-${p.id}) | ${p.severity} | ${SHORT[p.detection]} | ${p.incidents[0] ? `${p.incidents[0].title} (${p.incidents[0].date.slice(0, 7)})` : `Rule: ${p.rules[0].source_name}`} |`)].join("\n");
 if (fs.existsSync(readme))
-  fs.writeFileSync(readme, fs.readFileSync(readme, "utf8").replace(/<!--n-->\d+<!--\/n-->/g, `<!--n-->${N}<!--/n-->`).replace(/<!--table-->[\s\S]*?<!--\/table-->/, `<!--table-->\n${table}\n<!--/table-->`));
+  fs.writeFileSync(readme, fs.readFileSync(readme, "utf8").replace(/<!--n-->\d+<!--\/n-->/g, `<!--n-->${N}<!--/n-->`).replace(/<!--mix-->[^<]*<!--\/mix-->/, `<!--mix-->${mix}<!--/mix-->`).replace(/<!--table-->[\s\S]*?<!--\/table-->/, `<!--table-->\n${table}\n<!--/table-->`));
 console.log(`built ${N} patterns: PLAYBOOK.md, skill/launch-blockers/SKILL.md, README count`);

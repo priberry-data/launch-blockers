@@ -10,12 +10,12 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 6. [The Supabase service_role (secret) key in the browser](#6-service-role-in-frontend) · critical · found by `launch-blockers check`
 7. [The .env file committed to git](#7-env-committed) · high · found by `launch-blockers check`
 8. [A backend function anyone on the internet can call](#8-unauthenticated-function) · high · found by `launch-blockers check`
-9. [A payment webhook that believes anyone](#9-webhook-unverified) · high · found by `launch-blockers check`
+9. [A payment webhook that believes anyone](#9-webhook-unverified) · medium · found by `launch-blockers check`
 10. [An access check that's backwards or only in the browser](#10-backwards-access-check) · critical · reviewed by your agent (the skill)
 11. [Change the number in the address, see someone else's data](#11-other-users-records) · critical · reviewed by your agent (the skill)
 12. [A private app that still lets anyone sign up](#12-open-signup-private-app) · high · reviewed by your agent (the skill)
 13. [An internal tool published to the open internet](#13-internal-tool-public) · high · reviewed by your agent (the skill)
-14. [Your coding agent can change the production database](#14-agent-can-write-production) · high · found by `launch-blockers check`
+14. [Your coding agent can change the production database](#14-agent-can-write-production) · medium · found by `launch-blockers check`
 15. [The live database isn't what your files say](#15-live-db-differs) · high · only visible on the live app
 
 <a id="1-no-rls"></a>
@@ -55,15 +55,15 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 > Find every Row Level Security policy in my database whose condition is simply true. For each, tell me whether the table holds anything about a specific person (names, emails, messages, payments, activity). Change nothing yet. Then propose a rewrite that limits it to the row's owner (auth.uid() = the owner column), as a new migration, and wait for my OK.
 
 **On the record:**
-- **2025-05-29, CVE-2025-48757: Lovable apps without working RLS.** The 170 affected apps included ones where RLS was enabled but misconfigured, not only missing. [Matt Palmer](https://mattpalmer.io/posts/statement-on-CVE-2025-48757/)
+- **2025-05-29, CVE-2025-48757: Lovable apps without working RLS.** The researchers counted apps where Row Level Security was missing or misconfigured. [Matt Palmer](https://mattpalmer.io/posts/statement-on-CVE-2025-48757/)
 - **Rule:** [Supabase docs: Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security)
 
 <a id="3-firebase-open-rules"></a>
 ## 3. Firebase rules that let anyone in ("if true" or test mode)
 
-**Severity:** critical · **Where:** Firebase, FlutterFlow, Replit, any app on Firestore · **Detection:** found by `launch-blockers check`
+**Severity:** critical · **Where:** Firebase, FlutterFlow, Replit, any app on Firestore · **Detection:** found by `launch-blockers check` (The scan catches if true and Firebase's test-mode rule. A rule that lets any signed-in user read everything (request.auth != null on its own) needs the skill's review.)
 
-**What it looks like:** allow read, write: if true; or the test-mode rule allow read, write: if request.time < timestamp.date(...).
+**What it looks like:** allow read, write: if true; the test-mode rule allow read, write: if request.time < timestamp.date(...); or allow read: if request.auth != null with no owner check, which anyone who signs up passes.
 
 **Why it leaks:** Firebase's config is public by design. The rules are the only lock. Test mode is meant for the first 30 days and is often forgotten.
 
@@ -74,7 +74,7 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 > Rewrite my Firebase security rules so no rule uses if true or the test-mode date check. A signed-in user should reach only their own documents (request.auth != null && request.auth.uid == the owner field or path segment). Keep anything truly public read-only and tell me which it is. Show me the new rules and how to test them in the Firebase emulator before deploying.
 
 **On the record:**
-- **2026-01-29, AI chat app exposes chat histories.** A researcher said a Firebase misconfiguration in the Chat & Ask AI app exposed about 300 million messages from more than 25 million users. It was fixed within hours of disclosure. *(The counts are the researcher's claims. The app is an AI chatbot; it isn't known to be AI-built.)* [404 Media](https://www.404media.co/massive-ai-chat-app-leaked-millions-of-users-private-conversations/)
+- **2026-01-29, AI chat app exposes chat histories.** A researcher said a Firebase misconfiguration in the Chat & Ask AI app exposed about 300 million messages from more than 25 million users. 404 Media reports Firebase made it easy to become an 'authenticated' user. It was fixed within hours. *(The counts are the researcher's claims, and neither report gives the exact rule. The app is an AI chatbot; it isn't known to be AI-built.)* [404 Media](https://www.404media.co/massive-ai-chat-app-leaked-millions-of-users-private-conversations/)
 - **2026-02-09, Same Firebase mistake in 103 of 200 iOS apps.** The same researcher scanned 200 iOS apps and found 103 with the same Firebase misconfiguration. [Malwarebytes](https://www.malwarebytes.com/blog/news/2026/02/ai-chat-app-leak-exposes-300-million-messages-tied-to-25-million-users)
 - **2026-02-01, 285 open Firebase databases in Android AI apps.** Cybernews researchers found 285 Firebase databases with no authentication among 38,630 Android apps with AI features. [TechRadar (reporting Cybernews)](https://www.techradar.com/pro/shock-report-claims-android-apps-have-leaked-over-730tb-of-user-data-and-google-secrets-here-are-some-of-the-worst-offenders-around)
 - **Rule:** [Firebase docs: avoid insecure rules](https://firebase.google.com/docs/rules/insecure-rules)
@@ -152,7 +152,7 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 > Check whether any .env file or hardcoded key is tracked by git. If so, remove it from version control without deleting my local copy (git rm --cached), add it to .gitignore, create an .env.example with names only, and list every key that was exposed so I can revoke and replace each one.
 
 **On the record:**
-- **2026-02-12, 5,000+ GitHub repositories with OpenAI keys.** Cyble reported over 5,000 public GitHub repositories with hardcoded OpenAI keys. [Cyble](https://cyble.com/blog/when-ai-secrets-go-public-chatgpt/)
+- **2026-02-12, 5,000+ GitHub repositories with OpenAI keys committed.** Cyble reported over 5,000 public GitHub repositories with hardcoded OpenAI keys. *(These were keys hardcoded in committed code, not necessarily .env files; the exposure is the same.)* [Cyble](https://cyble.com/blog/when-ai-secrets-go-public-chatgpt/)
 
 <a id="8-unauthenticated-function"></a>
 ## 8. A backend function anyone on the internet can call
@@ -175,7 +175,7 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 <a id="9-webhook-unverified"></a>
 ## 9. A payment webhook that believes anyone
 
-**Severity:** high · **Where:** Stripe, Lemon Squeezy, Paddle · **Detection:** found by `launch-blockers check`
+**Severity:** medium · **Where:** Stripe, Lemon Squeezy, Paddle · **Detection:** found by `launch-blockers check` (Shown by the check, but doesn't block a deploy: the scan can't be sure (the check may live in another file).)
 
 **What it looks like:** A Stripe webhook handler that parses the body and grants access without stripe.webhooks.constructEvent.
 
@@ -224,7 +224,7 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 > Find every API route, server action or database query that takes a record id from the request. For each, check that it also confirms the record belongs to the signed-in user (or that they're allowed to see it). Fix any that don't, and add a test where a second user asks for the first user's record and gets nothing. Show me the list first.
 
 **On the record:**
-- **Rule:** [OWASP API Security Top 10: API1 Broken Object Level Authorization](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/)
+- **Rule:** [OWASP API Security Top 10: API1 Broken Object Level Authorization](https://api-security.owasp.org/editions/2023/en/0xa1-broken-object-level-authorization)
 
 <a id="12-open-signup-private-app"></a>
 ## 12. A private app that still lets anyone sign up
@@ -265,7 +265,7 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 <a id="14-agent-can-write-production"></a>
 ## 14. Your coding agent can change the production database
 
-**Severity:** high · **Where:** Claude Code, Cursor, Replit Agent, any MCP database server · **Detection:** found by `launch-blockers check` (A database MCP server without read-only mode is found in .mcp.json and similar files.)
+**Severity:** medium · **Where:** Claude Code, Cursor, Replit Agent, any MCP database server · **Detection:** found by `launch-blockers check` (A database MCP server without read-only mode is found in .mcp.json and similar files. Shown by the check, but doesn't block a deploy: the scan can't be sure (the check may live in another file).)
 
 **What it looks like:** A Supabase or Postgres MCP server in .mcp.json with write access, pointed at the live project.
 
@@ -278,7 +278,7 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 > Look at my coding-agent configuration (.mcp.json, .cursor/mcp.json and similar). For any database connection, tell me whether it can write and whether it points at the live project. Change it to read-only and to a development project, and tell me how to keep a tested backup of production. Change nothing until I confirm.
 
 **On the record:**
-- **2025-07-23, Replit agent deletes a production database.** During a declared code freeze, Replit's AI agent deleted a live production database holding data on more than 1,200 executives and 1,190 companies. The data was recovered. [Fortune](https://fortune.com/2025/07/23/ai-coding-tool-replit-wiped-database-called-it-a-catastrophic-failure/)
+- **2025-07, Replit agent deletes a production database.** During a declared code freeze, Replit's AI agent deleted a live production database holding data on more than 1,200 executives and 1,190 companies. The data was recovered. *(Fortune published this on 23 Jul 2025; it gives no exact incident date.)* [Fortune](https://fortune.com/2025/07/23/ai-coding-tool-replit-wiped-database-called-it-a-catastrophic-failure/)
 
 <a id="15-live-db-differs"></a>
 ## 15. The live database isn't what your files say

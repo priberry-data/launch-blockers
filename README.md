@@ -1,8 +1,8 @@
 # Launch Blockers
 
-**The <!--n-->15<!--/n--> ways AI-built apps leak their users' data, each one tied to a real incident, checked before you launch.**
+**The <!--n-->15<!--/n--> ways AI-built apps leak their users' data, each one on the public record, checked before you launch.**
 
-Built your app with Lovable, Bolt, v0, Replit, Cursor or Claude Code? These are the mistakes behind the leaks in the news: open databases, keys in the browser, Firebase left in test mode. Every pattern links to a dated public incident or the platform's own rule, comes with a fix prompt you paste into your builder, and has a check that runs before you deploy.
+Built your app with Lovable, Bolt, v0, Replit, Cursor or Claude Code? These are the mistakes behind the leaks in the news: open databases, keys in the browser, Firebase left in test mode. Every pattern links to a dated public incident or the platform's own rule, comes with a fix prompt you paste into your builder, and has a check that runs before you deploy. (<!--mix-->11 from dated incidents or studies, 4 from the platform's own rules<!--/mix-->.)
 
 ```text
 $ npx launch-blockers check
@@ -46,14 +46,14 @@ None of these needed a hacker. Each was one setting.
 | 4 | [File storage anyone can read (ID photos, documents, uploads)](PLAYBOOK.md#4-public-storage) | critical | scan | Tea app: verification selfies and IDs exposed (2025-07) |
 | 5 | [A paid API key (OpenAI, Gemini, Stripe...) shipped in the browser code](PLAYBOOK.md#5-secret-in-frontend) | critical | scan | About 3,000 websites exposing ChatGPT keys (2026-02) |
 | 6 | [The Supabase service_role (secret) key in the browser](PLAYBOOK.md#6-service-role-in-frontend) | critical | scan | Rule: Supabase docs: API keys |
-| 7 | [The .env file committed to git](PLAYBOOK.md#7-env-committed) | high | scan | 5,000+ GitHub repositories with OpenAI keys (2026-02) |
+| 7 | [The .env file committed to git](PLAYBOOK.md#7-env-committed) | high | scan | 5,000+ GitHub repositories with OpenAI keys committed (2026-02) |
 | 8 | [A backend function anyone on the internet can call](PLAYBOOK.md#8-unauthenticated-function) | high | scan | Rule: Supabase docs: function configuration (verify_jwt) |
-| 9 | [A payment webhook that believes anyone](PLAYBOOK.md#9-webhook-unverified) | high | scan | Rule: Stripe docs: verify webhook signatures |
+| 9 | [A payment webhook that believes anyone](PLAYBOOK.md#9-webhook-unverified) | medium | scan | Rule: Stripe docs: verify webhook signatures |
 | 10 | [An access check that's backwards or only in the browser](PLAYBOOK.md#10-backwards-access-check) | critical | agent review | Lovable-showcased app with an inverted access check (2026-02) |
 | 11 | [Change the number in the address, see someone else's data](PLAYBOOK.md#11-other-users-records) | critical | agent review | Rule: OWASP API Security Top 10: API1 Broken Object Level Authorization |
 | 12 | [A private app that still lets anyone sign up](PLAYBOOK.md#12-open-signup-private-app) | high | agent review | Base44: anyone could join private apps (2025-07) |
 | 13 | [An internal tool published to the open internet](PLAYBOOK.md#13-internal-tool-public) | high | agent review | RedAccess: thousands of public vibe-coded apps with company data (2026-05) |
-| 14 | [Your coding agent can change the production database](PLAYBOOK.md#14-agent-can-write-production) | high | scan | Replit agent deletes a production database (2025-07) |
+| 14 | [Your coding agent can change the production database](PLAYBOOK.md#14-agent-can-write-production) | medium | scan | Replit agent deletes a production database (2025-07) |
 | 15 | [The live database isn't what your files say](PLAYBOOK.md#15-live-db-differs) | high | live check | Crissy Field scan of 159,041 Lovable projects (2026-11) |
 <!--/table-->
 
@@ -68,6 +68,8 @@ Full detail, fix prompts and sources: **[PLAYBOOK.md](PLAYBOOK.md)**. Machine-re
   - **BLOCKED:** the deploy is stopped and your agent gets the reasons and fix prompts.
   - **NOT CHECKED:** the check couldn't run, so you're asked. It never passes silently.
   - **CLEAR:** nothing changes; your usual approval still applies, with a note of what wasn't checked.
+
+Checked a finding yourself and it's fine (say, Row Level Security switched on in the dashboard)? Add its id and your reason to `.launch-blockers-ignore`. A line without a reason doesn't count, and ignored findings are always listed in the output.
 
 Use `--global` to install for every project. The skill file works in any agent that reads skills; the deploy guard is for Claude Code today.
 

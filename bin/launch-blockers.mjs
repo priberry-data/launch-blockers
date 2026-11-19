@@ -31,7 +31,7 @@ else if (cmd === "check") {
   const { install } = await import("../src/install.mjs");
   try {
     const done = install({ global: opt.global, dir: positionals[1] || ".", version: VERSION });
-    console.log(`launch-blockers installed for Claude Code${opt.global ? " (every project)" : ""}:\n${done.map((d) => `  ${d}`).join("\n")}\n\nIn Claude Code, ask: "run the launch-blockers skill". Deploy commands are now checked first.\nRestart Claude Code (or open /hooks) so it picks up the new setting.`);
+    console.log(`launch-blockers installed for Claude Code${opt.global ? " (every project)" : ""}:\n${done.map((d) => `  ${d}`).join("\n")}\n\nIn Claude Code, ask: "run the launch-blockers skill". Deploy commands are now checked first.\nClaude Code picks up the new setting by itself; /hooks shows it.`);
   } catch (e) {
     console.error(`launch-blockers: ${e.message}`);
     process.exitCode = 2;

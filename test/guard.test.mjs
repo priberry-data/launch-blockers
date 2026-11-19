@@ -46,7 +46,7 @@ test("check: exit codes and statuses for leaky, clean, Firebase and missing proj
 test("guard: a deploy of a leaky project is refused, with the fix prompts", () => {
   const dir = copy("leaky");
   install(dir);
-  for (const cmd of ["vercel --prod", "npx vercel deploy", "supabase db push", "firebase deploy --only hosting", "npm run deploy", "cd web && netlify deploy --prod"]) {
+  for (const cmd of ["vercel --prod", "vercel", "npx -y vercel deploy", "VERCEL_ORG_ID=x vercel --prod", "supabase db push", "npx supabase functions deploy hello", "firebase deploy --only hosting", "npm run deploy", "yarn deploy", "cd web && netlify deploy --prod", 'bash -c "wrangler pages deploy dist"', "./node_modules/.bin/vercel --prod"]) {
     const o = hook(dir, cmd);
     assert.equal(decision(o), "deny", cmd);
     assert.match(o.hookSpecificOutput.permissionDecisionReason, /VITE_OPENAI_API_KEY/);
@@ -57,7 +57,8 @@ test("guard: a deploy of a leaky project is refused, with the fix prompts", () =
 test("guard: ordinary commands, other tools and a clean deploy pass untouched", () => {
   const leaky = copy("leaky");
   install(leaky);
-  for (const cmd of ["npm test", "vercel env pull", "vercel login", "git push", "ls supabase"]) assert.equal(hook(leaky, cmd), null, cmd);
+  for (const cmd of ["npm test", "vercel env pull", "vercel login", "vercel build", "git push", "ls supabase", "cat vercel.json", "git add vercel.json firebase.json", "npm i -D vercel", 'git commit -m "fix: firebase deploy; vercel --prod"', "echo 'supabase db push'", "grep -r netlify deploy.md", "pnpm deploy ./out"])
+    assert.equal(hook(leaky, cmd), null, cmd);
   assert.equal(hook(leaky, "vercel --prod", "Read"), null, "only shell commands are looked at");
   const clean = copy("clean");
   install(clean);
@@ -113,4 +114,22 @@ test("data: every pattern has a source, a fix prompt and an honest detection fie
     const text = fs.readFileSync(path.join(ROOT, f), "utf8");
     assert.ok(text.includes(`${patterns.length} `), `${f} states the real count (${patterns.length})`);
   }
+});
+
+test("ignore file: a reviewed finding with a reason stops blocking and is always listed; one without a reason still blocks", () => {
+  const dir = copy("leaky");
+  const run = () => JSON.parse(spawnSync("node", [BIN, "check", dir, "--json"], { encoding: "utf8" }).stdout);
+  fs.writeFileSync(path.join(dir, ".launch-blockers-ignore"), "# reviewed\nscan:no-rls:profiles   RLS enabled in the dashboard, confirmed with greenlitlab --mine\nscan:public-secret:VITE_OPENAI_API_KEY\n");
+  const r = run();
+  assert.equal(r.status, "BLOCKED", "the key line has no reason, so it still blocks");
+  assert.deepEqual(r.blocking.map((f) => f.id), ["scan:public-secret:VITE_OPENAI_API_KEY"]);
+  assert.equal(r.ignored[0].id, "scan:no-rls:profiles");
+  assert.match(spawnSync("node", [BIN, "check", dir], { encoding: "utf8" }).stdout, /Ignored by you/);
+  fs.rmSync(dir, { recursive: true });
+});
+
+test("a signed webhook with verify_jwt = false doesn't block", () => {
+  const r = JSON.parse(spawnSync("node", [BIN, "check", path.join(ROOT, "samples", "webhook"), "--json"], { encoding: "utf8" }).stdout);
+  assert.equal(r.status, "CLEAR");
+  assert.equal(r.other[0].severity, "low");
 });

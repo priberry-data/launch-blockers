@@ -27,13 +27,33 @@ function listFiles(root, max = 4000) {
   return out;
 }
 
+// .launch-blockers-ignore: one finding per line, its id then the reason a person checked it, e.g.
+//   scan:verify-jwt:stripe-webhook   signed webhook: verifies the Stripe-Signature header itself
+// A line without a reason is ignored itself, so nothing gets waved through by accident. Ignored findings are always listed.
+export const IGNORE_FILE = ".launch-blockers-ignore";
+function readIgnores(root) {
+  let text = "";
+  try {
+    text = fs.readFileSync(path.join(root, IGNORE_FILE), "utf8");
+  } catch {
+    return [];
+  }
+  return text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#"))
+    .map((l) => l.match(/^(\S+)\s+(.{8,})$/))
+    .filter(Boolean)
+    .map((m) => ({ id: m[1], reason: m[2].trim() }));
+}
+
 export function check(dir = ".") {
   const root = path.resolve(dir);
   let scan;
   try {
     scan = codeScan(root);
   } catch (e) {
-    return { status: "NOT CHECKED", dir: root, reason: e.message, blocking: [], other: [], notChecked: [] };
+    return { status: "NOT CHECKED", dir: root, reason: e.message, blocking: [], other: [], ignored: [], notChecked: [] };
   }
   const files = listFiles(root);
   const notChecked = [];
@@ -42,10 +62,18 @@ export function check(dir = ".") {
   }
   notChecked.push({ pattern: "client-side-auth", what: "Who-can-see-what logic in your own code", how: "No pattern scan can judge this. The launch-blockers skill walks your agent through it." });
 
-  if (scan.files === 0) return { status: "NOT CHECKED", dir: root, reason: "No code files were found here.", blocking: [], other: [], notChecked };
-  const blocking = scan.findings.filter((f) => BLOCKS.has(f.severity));
-  const other = scan.findings.filter((f) => !BLOCKS.has(f.severity));
-  return { status: blocking.length ? "BLOCKED" : "CLEAR", dir: root, files: scan.files, blocking, other, notChecked };
+  if (scan.files === 0) return { status: "NOT CHECKED", dir: root, reason: "No code files were found here.", blocking: [], other: [], ignored: [], notChecked };
+  const ignores = readIgnores(root);
+  const ignored = [];
+  const live = [];
+  for (const f of scan.findings) {
+    const rule = ignores.find((i) => i.id === f.id);
+    if (rule) ignored.push({ ...f, reason: rule.reason });
+    else live.push(f);
+  }
+  const blocking = live.filter((f) => BLOCKS.has(f.severity));
+  const other = live.filter((f) => !BLOCKS.has(f.severity));
+  return { status: blocking.length ? "BLOCKED" : "CLEAR", dir: root, files: scan.files, blocking, other, ignored, notChecked };
 }
 
 export function render(r, { color = false } = {}) {
@@ -56,8 +84,9 @@ export function render(r, { color = false } = {}) {
   if (r.blocking.length) {
     lines.push(`${r.blocking.length} thing${r.blocking.length > 1 ? "s" : ""} to fix before you launch:`);
     r.blocking.forEach((f, i) => lines.push(``, `${i + 1}. ${f.title}  [${f.severity}]`, `   ${f.where}`, `   ${f.why}`, `   Fix prompt for your builder:`, `   ${c("2", f.prompt)}`));
-    lines.push("");
+    lines.push("", `Checked one yourself and it's fine (say, RLS turned on in the dashboard)? Add a line to ${IGNORE_FILE}: its id from the list below, then why.`, ...r.blocking.map((f) => `   ${f.id}`), "");
   } else if (r.status === "CLEAR") lines.push(`Nothing in the ${r.files} files read matches a known leak pattern.`, "");
+  if (r.ignored?.length) lines.push(`Ignored by you in ${IGNORE_FILE}:`, ...r.ignored.map((f) => `  - ${f.title} (${f.id}): ${f.reason}`), "");
   if (r.other.length) lines.push(`Also worth a look (doesn't block): ${r.other.map((f) => f.title).join("; ")}`, "");
   if (r.notChecked.length) {
     lines.push("Not checked (CLEAR never covers these):");

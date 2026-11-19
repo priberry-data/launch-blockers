@@ -1,7 +1,7 @@
 {
   "name": "launch-blockers",
   "version": "0.1.0",
-  "description": "The documented ways AI-built apps leak their users' data, each tied to a real incident, with a fix prompt, an agent skill that checks your project, and a guard that stops the deploy when it finds one.",
+  "description": "The documented ways AI-built apps leak their users' data, each backed by a public incident or the platform's own rule, with a fix prompt, an agent skill that checks your project, and a guard that stops the deploy when it finds one.",
   "type": "module",
   "bin": { "launch-blockers": "bin/launch-blockers.mjs" },
   "files": ["bin", "src", "data", "skill", "README.md", "PLAYBOOK.md", "LICENSE"],

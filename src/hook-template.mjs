@@ -8,16 +8,37 @@
 import { execFileSync } from "node:child_process";
 
 const VERSION = "__VERSION__";
-const DEPLOY = [
-  /\bvercel\b(?!\s+(?:dev|env|link|login|logout|pull|whoami|ls|list|logs|inspect|domains|teams|switch|help|init|--version|-v)\b)/,
-  /\bnetlify\s+deploy\b/,
-  /\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/,
-  /\bfirebase\s+deploy\b/,
-  /\bwrangler\s+(?:pages\s+)?deploy\b/,
-  /\bfly(?:ctl)?\s+deploy\b/,
-  /\brailway\s+up\b/,
-  /\b(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?deploy\b/,
-];
+// A command counts as a deploy only when the deploy tool is the program being run, not text inside it:
+// `git commit -m "firebase deploy"`, `cat vercel.json` and `npm i vercel` are not deploys.
+const WRAPPERS = new Set(["npx", "bunx", "sudo", "env", "time", "exec"]);
+function isDeploy(command) {
+  // A command handed to a shell (bash -c "...") is checked as a command of its own.
+  for (const m of command.matchAll(/\b(?:ba|z)?sh\s+-c\s+(["'])((?:(?!\1).)*)\1/g)) if (isDeploy(m[2])) return true;
+  // Quoted text is data (a commit message, an echo), never a command: blank it before reading.
+  command = command.replace(/"(?:[^"\\]|\\.)*"|'[^']*'/g, '""');
+  for (const seg of command.split(/&&|\|\||[;|\n&()]/)) {
+    let t = seg.trim().split(/\s+/).filter(Boolean).map((w) => w.replace(/^["']|["']$/g, ""));
+    let wrapped = false;
+    while (t.length) {
+      if (/^\w+=/.test(t[0]) || WRAPPERS.has(t[0])) (t.shift(), (wrapped = true));
+      else if (wrapped && /^-/.test(t[0])) t.shift(); // a wrapper's own flags, like npx -y
+      else break;
+    }
+    if (["pnpm", "yarn"].includes(t[0]) && t[1] === "dlx") t = t.slice(2);
+    if (t[0] === "npm" && t[1] === "exec") t = t.slice(2).filter((w) => w !== "--");
+    const [prog, a, b] = [t[0]?.split("/").pop(), t[1], t[2]];
+    if (!prog) continue;
+    if (prog === "vercel" && (a === undefined || a === "deploy" || a === "--prod" || a?.startsWith("-") && t.includes("--prod"))) return true;
+    if (prog === "netlify" && a === "deploy") return true;
+    if (prog === "supabase" && ((a === "db" && b === "push") || (a === "functions" && b === "deploy"))) return true;
+    if (prog === "firebase" && a === "deploy") return true;
+    if (prog === "wrangler" && (a === "deploy" || (a === "pages" && b === "deploy"))) return true;
+    if ((prog === "fly" || prog === "flyctl") && a === "deploy") return true;
+    if (prog === "railway" && a === "up") return true;
+    if (["npm", "pnpm", "yarn", "bun"].includes(prog) && ((a === "run" && b === "deploy") || (prog === "yarn" && a === "deploy"))) return true;
+  }
+  return false;
+}
 
 const out = (decision, reason, note) =>
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: decision, permissionDecisionReason: reason }, ...(note ? { systemMessage: note } : {}) }));
@@ -31,7 +52,7 @@ try {
   process.exit(0); // not something we understand: stay out of the way
 }
 const command = input?.tool_input?.command;
-if (input?.tool_name !== "Bash" || typeof command !== "string" || !DEPLOY.some((re) => re.test(command))) process.exit(0);
+if (input?.tool_name !== "Bash" || typeof command !== "string" || !isDeploy(command)) process.exit(0);
 
 const cwd = input.cwd || process.cwd();
 let result;

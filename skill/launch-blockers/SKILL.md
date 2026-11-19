@@ -40,12 +40,8 @@ Builders publish to a public URL by default. A tool meant for five colleagues is
 
 What to do: This app is meant only for my team. Make every page and every data request require a signed-in user from an allowed list before anything loads, check that the published address shows nothing to a signed-out visitor, and tell me which visibility setting to change in my builder so it isn't public.
 
-### 2.5 The live database isn't what your files say
-Every file-based check, including this one, reads your files. Your users' data lives in the live database.
+## 3. The live app
+A file scan can't see the live database: rules changed in the Supabase or Firebase console never show up in files. Don't query the live database yourself. Tell the user to run `npx greenlitlab <their-app-url> --mine` on their own app; it counts which tables a stranger can read and never reads data.
 
-What to do: Compare my live database's security settings with my migrations: for every table, tell me whether Row Level Security is on and which policies exist in the live project, and list anything that differs from the files. Then write migrations that make the files match the safe version. Change nothing in the live database yourself.
-
-For the live database, don't run anything yourself: tell the user to run `npx greenlitlab <their-app-url> --mine` on their own app.
-
-## 3. Report
+## 4. Report
 Finish with a short table: each of the 15 patterns, and whether it's blocked, clear, not applicable or not checked. Put anything blocked first, with the fix you propose. End with one line: what still can't be checked from here.
