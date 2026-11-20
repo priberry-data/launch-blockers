@@ -6,4 +6,4 @@
 - `launch-blockers check`: BLOCKED, CLEAR or NOT CHECKED for a project on your computer, using Greenlit's project scan (greenlitlab 0.4.4, which adds Firebase rules).
 - `launch-blockers install`: a Claude Code skill, and a guard that checks the project before deploy commands.
 - `launch-blockers list`: every pattern with the incident behind it.
-- Website at blockers.priberry.com (`site/`, a Cloudflare Worker serving static files; deploy config in `site.wrangler.jsonc`, deployed from a copy outside the repo).
+- Website at greenlit.priberry.com/blockers/: `site/` uses relative paths only and is copied into Greenlit's site with `npm run site`.

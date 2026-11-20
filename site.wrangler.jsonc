@@ -1,6 +1,0 @@
-{
-  "name": "blockers-site",
-  "compatibility_date": "2026-11-18",
-  "assets": { "directory": "site", "not_found_handling": "404-page" },
-  "routes": [{ "pattern": "blockers.priberry.com", "custom_domain": true }]
-}
