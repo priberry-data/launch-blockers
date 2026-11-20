@@ -16,10 +16,9 @@ const copy = (sample) => {
 const install = (dir) => execFileSync("node", [BIN, "install", dir], { encoding: "utf8" });
 // Calls the installed guard exactly as Claude Code does: hook JSON on stdin, decision JSON on stdout.
 const hook = (dir, command, tool = "Bash") => {
-  const r = spawnSync("node", [path.join(dir, ".claude", "hooks", "launch-blockers-guard.mjs")], {
+  const r = spawnSync("node", [path.join(dir, ".claude", "hooks", "launch-blockers", "guard.mjs")], {
     input: JSON.stringify({ hook_event_name: "PreToolUse", tool_name: tool, tool_input: { command }, cwd: dir }),
     encoding: "utf8",
-    env: { ...process.env, LAUNCH_BLOCKERS_CMD: `node ${BIN}` },
   });
   assert.equal(r.status, 0, r.stderr);
   return r.stdout ? JSON.parse(r.stdout) : null;
@@ -57,8 +56,10 @@ test("guard: a deploy of a leaky project is refused, with the fix prompts", () =
 test("guard: ordinary commands, other tools and a clean deploy pass untouched", () => {
   const leaky = copy("leaky");
   install(leaky);
-  for (const cmd of ["npm test", "vercel env pull", "vercel login", "vercel build", "git push", "ls supabase", "cat vercel.json", "git add vercel.json firebase.json", "npm i -D vercel", 'git commit -m "fix: firebase deploy; vercel --prod"', "echo 'supabase db push'", "grep -r netlify deploy.md", "pnpm deploy ./out"])
+  for (const cmd of ["npm test", "vercel env pull", "vercel login", "vercel build", "ls supabase", "cat vercel.json", "git add vercel.json firebase.json", "npm i -D vercel", 'git commit -m "fix: firebase deploy; vercel --prod"', "echo 'supabase db push'", "grep -r netlify deploy.md", "pnpm deploy ./out", "git push origin feature/x"])
     assert.equal(hook(leaky, cmd), null, cmd);
+  // A push to main may deploy (hosts often deploy from git with no config file), so it's asked, not refused.
+  assert.equal(decision(hook(leaky, "git push origin main")), "ask");
   assert.equal(hook(leaky, "vercel --prod", "Read"), null, "only shell commands are looked at");
   const clean = copy("clean");
   install(clean);
@@ -73,10 +74,10 @@ test("guard: ordinary commands, other tools and a clean deploy pass untouched", 
 test("guard: when the check can't run, you're asked; it never passes silently", () => {
   const dir = copy("clean");
   install(dir);
-  const r = spawnSync("node", [path.join(dir, ".claude", "hooks", "launch-blockers-guard.mjs")], {
+  fs.rmSync(path.join(dir, ".claude", "hooks", "launch-blockers", "run-check.mjs")); // the check can't run
+  const r = spawnSync("node", [path.join(dir, ".claude", "hooks", "launch-blockers", "guard.mjs")], {
     input: JSON.stringify({ tool_name: "Bash", tool_input: { command: "vercel --prod" }, cwd: dir }),
     encoding: "utf8",
-    env: { ...process.env, LAUNCH_BLOCKERS_CMD: "node /nonexistent/launch-blockers.mjs" },
   });
   assert.equal(decision(JSON.parse(r.stdout)), "ask");
   fs.rmSync(dir, { recursive: true });
@@ -92,7 +93,8 @@ test("install: adds to existing settings without touching them, and only once", 
   assert.deepEqual(s.permissions, { allow: ["Bash(npm test)"] });
   assert.equal(s.hooks.PreToolUse.length, 2);
   assert.ok(fs.existsSync(path.join(dir, ".claude", "skills", "launch-blockers", "SKILL.md")));
-  const guard = fs.readFileSync(path.join(dir, ".claude", "hooks", "launch-blockers-guard.mjs"), "utf8");
+  assert.ok(fs.existsSync(path.join(dir, ".agents", "skills", "launch-blockers", "SKILL.md")), "other agents get the skill too");
+  const guard = fs.readFileSync(path.join(dir, ".claude", "hooks", "launch-blockers", "guard.mjs"), "utf8");
   assert.ok(!guard.includes("__VERSION__"), "the guard is pinned to this version");
   fs.writeFileSync(path.join(dir, ".claude", "settings.json"), "{ not json");
   assert.throws(() => install(dir), /isn't valid JSON/);
@@ -119,11 +121,11 @@ test("data: every pattern has a source, a fix prompt and an honest detection fie
 test("ignore file: a reviewed finding with a reason stops blocking and is always listed; one without a reason still blocks", () => {
   const dir = copy("leaky");
   const run = () => JSON.parse(spawnSync("node", [BIN, "check", dir, "--json"], { encoding: "utf8" }).stdout);
-  fs.writeFileSync(path.join(dir, ".launch-blockers-ignore"), "# reviewed\nscan:no-rls:profiles   RLS enabled in the dashboard, confirmed with greenlitlab --mine\nscan:public-secret:VITE_OPENAI_API_KEY\n");
+  fs.writeFileSync(path.join(dir, ".launch-blockers-ignore"), "# reviewed\nscan:no-rls:profiles   RLS enabled in the dashboard, confirmed with greenlitlab --mine\nlb:public-read:messages  a public guestbook, every message is meant to be seen\nscan:public-secret:VITE_OPENAI_API_KEY\n");
   const r = run();
   assert.equal(r.status, "BLOCKED", "the key line has no reason, so it still blocks");
   assert.deepEqual(r.blocking.map((f) => f.id), ["scan:public-secret:VITE_OPENAI_API_KEY"]);
-  assert.equal(r.ignored[0].id, "scan:no-rls:profiles");
+  assert.deepEqual(r.ignored.map((f) => f.id).sort(), ["lb:public-read:messages", "scan:no-rls:profiles"]);
   assert.match(spawnSync("node", [BIN, "check", dir], { encoding: "utf8" }).stdout, /Ignored by you/);
   fs.rmSync(dir, { recursive: true });
 });

@@ -1,0 +1,88 @@
+// Scan cases from the 20 Nov 2026 audit: each builds a tiny project and says what the check must answer.
+// "BLOCKED?" means anything but CLEAR; "?" means no fixed answer.
+const C = "CANARYv4lue9f3b2c"; // planted as every secret value
+const T = (sql) => `create table public.profiles (id uuid primary key, email text);\n${sql}`;
+const RLS = "alter table public.profiles enable row level security;\n";
+export const cases = {
+  // --- RLS ---
+  "rls-later-migration": { files: { "supabase/migrations/001_init.sql": T(""), "supabase/migrations/002_rls.sql": RLS }, expect: "CLEAR" },
+  "rls-quoted-upper-schema": { files: { "supabase/migrations/001.sql": 'CREATE TABLE "public"."Profiles" (id int);\nALTER TABLE "public"."Profiles" ENABLE ROW LEVEL SECURITY;\n' }, expect: "CLEAR" },
+  "rls-alter-only": { files: { "supabase/migrations/001.sql": "create table profiles(id int);\nalter table only public.profiles enable row level security;\n" }, expect: "CLEAR" },
+  "rls-disabled-later": { files: { "supabase/migrations/001.sql": T(RLS), "supabase/migrations/002.sql": "alter table public.profiles disable row level security;\n" }, expect: "BLOCKED" },
+  "rls-drop-recreate": { files: { "supabase/migrations/001.sql": T(RLS), "supabase/migrations/002.sql": "drop table public.profiles;\ncreate table public.profiles (id uuid, email text);\n" }, expect: "BLOCKED" },
+  "rls-enabled-before-create-other-file-order": { files: { "supabase/migrations/20240101_rls.sql": RLS, "supabase/migrations/20230101_init.sql": T("") }, expect: "CLEAR" },
+  "rls-migrations-outside-supabase": { files: { "db/migrations/001.sql": T(""), "src/db.ts": "import { createClient } from '@supabase/supabase-js'\n" }, expect: "BLOCKED?" },
+  "rls-schema-sql-not-migrations": { files: { "supabase/schema.sql": T("") }, expect: "BLOCKED" },
+  "rls-in-1mb-file": { files: { "supabase/migrations/0000_remote_schema.sql": T("") + ("-- " + "x".repeat(200) + "\n").repeat(5300) }, expect: "BLOCKED" },
+  "rls-E-string-apostrophe": { files: { "supabase/migrations/001.sql": "create table public.notes(id int);\nselect E'it\\'s';\ncreate table public.profiles(id int);\n" }, expect: "BLOCKED" },
+  "rls-dollar-quote-apostrophe": { files: { "supabase/migrations/001.sql": "create table public.notes(id int);\nalter table public.notes enable row level security;\ncreate function f() returns void language plpgsql as $$ begin raise notice 'don''t'; perform 1; end $$;\ncreate function g() returns text language sql as $$ select 'a' || chr(39) $$;\ncomment on function g is $c$ it's $c$;\ncreate table public.profiles(id int);\n" }, expect: "BLOCKED" },
+  // --- open policies ---
+  "policy-select-true-anon": { files: { "supabase/migrations/001.sql": T(RLS + "create policy \"read all\" on public.profiles for select to anon using (true);\n") }, expect: "BLOCKED" },
+  "policy-all-true-spaces": { files: { "supabase/migrations/001.sql": T(RLS + "create policy p on public.profiles for all using (  TRUE  ) with check ( true );\n") }, expect: "BLOCKED" },
+  "policy-all-true-newlines": { files: { "supabase/migrations/001.sql": T(RLS + "create policy p\n  on public.profiles\n  for all\n  to anon, authenticated\n  using (\n    true\n  );\n") }, expect: "BLOCKED" },
+  "policy-update-1eq1": { files: { "supabase/migrations/001.sql": T(RLS + "create policy p on public.profiles for update using (1=1);\n") }, expect: "BLOCKED" },
+  "policy-update-authed-notnull": { files: { "supabase/migrations/001.sql": T(RLS + "create policy p on public.profiles for update to authenticated using (auth.uid() is not null);\n") }, expect: "BLOCKED" },
+  "policy-delete-true-or": { files: { "supabase/migrations/001.sql": T(RLS + "create policy p on public.profiles for delete using (true or auth.uid() = id);\n") }, expect: "BLOCKED" },
+  "policy-no-semicolon-eof": { files: { "supabase/migrations/001.sql": T(RLS + "create policy p on public.profiles for all using (true)") }, expect: "BLOCKED" },
+  "policy-as-permissive": { files: { "supabase/migrations/001.sql": T(RLS + "create policy p on public.profiles as permissive for all to public using (true);\n") }, expect: "BLOCKED" },
+  "policy-renamed-later": { files: { "supabase/migrations/001.sql": T(RLS + "create policy p on public.profiles for all using (true);\n"), "supabase/migrations/002.sql": "alter policy p on public.profiles rename to q;\n" }, expect: "BLOCKED" },
+  "policy-alter-to-true": { files: { "supabase/migrations/001.sql": T(RLS + "create policy p on public.profiles for all using (auth.uid() = id);\n"), "supabase/migrations/002.sql": "alter policy p on public.profiles using (true);\n" }, expect: "BLOCKED" },
+  "grant-all-anon-no-rls-dynamic": { files: { "supabase/migrations/001.sql": T("do $$ begin execute 'alter table public.x enable row level security'; end $$;\n") }, expect: "BLOCKED" },
+  // --- storage ---
+  "storage-bucket-sql-public": { files: { "supabase/migrations/001.sql": "insert into storage.buckets (id, name, public) values ('ids', 'ids', true);\n" }, expect: "BLOCKED" },
+  "storage-bucket-config-toml": { files: { "supabase/config.toml": "[storage.buckets.ids]\npublic = true\nfile_size_limit = \"50MiB\"\n", "src/a.ts": "x" }, expect: "BLOCKED" },
+  "storage-objects-select-true": { files: { "supabase/migrations/001.sql": "create policy \"read\" on storage.objects for select using (true);\n" }, expect: "BLOCKED" },
+  "storage-objects-bucket-only": { files: { "supabase/migrations/001.sql": "create policy \"read\" on storage.objects for select to public using (bucket_id = 'ids');\n" }, expect: "BLOCKED" },
+  // --- secrets ---
+  "secret-next-public-service-role": { files: { "src/a.ts": "export const k = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;\n" }, expect: "BLOCKED" },
+  "secret-vite-aws-secret-access-key": { files: { "src/a.ts": "const k = import.meta.env.VITE_AWS_SECRET_ACCESS_KEY;\n" }, expect: "BLOCKED" },
+  "secret-vite-stripe-sk": { files: { "src/a.ts": "const k = import.meta.env.VITE_STRIPE_SECRET_KEY;\n" }, expect: "BLOCKED" },
+  "secret-vite-stripe-api-key": { files: { "src/a.ts": "const k = import.meta.env.VITE_STRIPE_API_KEY;\n" }, expect: "BLOCKED" },
+  "secret-expo-elevenlabs": { files: { "app/a.tsx": "const k = process.env.EXPO_PUBLIC_ELEVENLABS_API_KEY;\n" }, expect: "BLOCKED" },
+  "secret-react-app-deepseek": { files: { "src/a.js": "const k = process.env.REACT_APP_DEEPSEEK_API_KEY;\n" }, expect: "BLOCKED" },
+  "secret-public-supabase-service-key": { files: { "src/a.svelte": "<script>const k = import.meta.env.PUBLIC_SUPABASE_SERVICE_KEY</script>\n" }, expect: "BLOCKED" },
+  "secret-next-public-openai-key": { files: { "src/a.ts": "const k = process.env.NEXT_PUBLIC_OPENAI_KEY;\n" }, expect: "BLOCKED" },
+  "secret-env-file-only": { files: { ".env": `VITE_OPENAI_API_KEY=${C}\n`, "src/a.ts": "x" }, expect: "BLOCKED" },
+  "secret-in-astro-file": { files: { "src/pages/a.astro": "---\nconst k = import.meta.env.PUBLIC_OPENAI_API_KEY;\n---\n", "package.json": "{}" }, expect: "BLOCKED" },
+  "service-role-in-client-noprefix": { files: { "src/lib/supabase.ts": "'use client'\nimport { createClient } from '@supabase/supabase-js'\nexport const admin = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!)\n" }, expect: "BLOCKED" },
+  "hardcoded-service-role-jwt": { files: { "src/lib/supabase.ts": `export const s = createClient("https://x.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.${C}")\n` }, expect: "BLOCKED" },
+  "hardcoded-sk-live": { files: { "src/pay.ts": `const stripe = new Stripe("sk_live_${C}")\n` }, expect: "BLOCKED" },
+  "hardcoded-openai-sk-proj": { files: { "src/ai.ts": `const openai = new OpenAI({ apiKey: "sk-proj-${C}", dangerouslyAllowBrowser: true })\n` }, expect: "BLOCKED" },
+  // --- env tracked ---
+  "env-tracked-dotenv": { git: [".env"], files: { ".env": `SECRET=${C}\n`, "src/a.ts": "x" }, expect: "BLOCKED" },
+  "env-tracked-development": { git: [".env.development"], files: { ".env.development": `SECRET=${C}\n`, "src/a.ts": "x" }, expect: "BLOCKED" },
+  "env-tracked-production-local": { git: [".env.production.local"], files: { ".env.production.local": `SECRET=${C}\n`, "src/a.ts": "x" }, expect: "BLOCKED" },
+  "env-tracked-dev-vars": { git: [".dev.vars"], files: { ".dev.vars": `SECRET=${C}\n`, "src/a.ts": "x" }, expect: "BLOCKED" },
+  "env-tracked-nested-local": { git: ["apps/web/.env.local"], files: { "apps/web/.env.local": `SECRET=${C}\n`, "src/a.ts": "x" }, expect: "BLOCKED" },
+  "env-present-untracked": { git: [], files: { ".env": `SECRET=${C}\n`, ".gitignore": ".env\n", "src/a.ts": "x" }, expect: "CLEAR" },
+  "env-tracked-subdir-scan": { gitRootFiles: true, git: [".env"], files: { ".env": `SECRET=${C}\n`, "web/src/a.ts": "x" }, scanSub: "web", expect: "BLOCKED" },
+  // --- firebase ---
+  "fb-if-true": { files: { "firestore.rules": "rules_version = '2';\nservice cloud.firestore { match /databases/{db}/documents { match /{d=**} { allow read, write: if true; } } }\n" }, expect: "BLOCKED" },
+  "fb-no-condition": { files: { "firestore.rules": "rules_version = '2';\nservice cloud.firestore { match /databases/{db}/documents { match /{d=**} { allow read, write; } } }\n" }, expect: "BLOCKED" },
+  "fb-paren-true": { files: { "firestore.rules": "service cloud.firestore { match /databases/{db}/documents { match /{d=**} { allow read: if (true); } } }\n" }, expect: "BLOCKED" },
+  "fb-auth-not-null-wildcard": { files: { "firestore.rules": "service cloud.firestore { match /databases/{db}/documents { match /{d=**} { allow read, write: if request.auth != null; } } }\n" }, expect: "BLOCKED" },
+  "fb-no-semicolon": { files: { "firestore.rules": "service cloud.firestore { match /databases/{db}/documents { match /{d=**} { allow read, write: if true } } }\n" }, expect: "BLOCKED" },
+  "fb-true-or": { files: { "firestore.rules": "service cloud.firestore { match /databases/{db}/documents { match /{d=**} { allow read: if true || request.auth != null; } } }\n" }, expect: "BLOCKED" },
+  "fb-custom-filename": { files: { "firebase.json": "{\"firestore\":{\"rules\":\"rules/prod.rules\"}}", "rules/prod.rules": "service cloud.firestore { match /databases/{db}/documents { match /{d=**} { allow read, write: if true; } } }\n" }, expect: "BLOCKED" },
+  "fb-storage-read-true": { files: { "storage.rules": "service firebase.storage { match /b/{bucket}/o { match /{all=**} { allow read: if true; } } }\n" }, expect: "BLOCKED" },
+  "fb-rtdb-auth-any": { files: { "database.rules.json": "{\"rules\":{\".read\":\"auth != null\",\".write\":\"auth != null\"}}" }, expect: "BLOCKED" },
+  "fb-rtdb-true": { files: { "database.rules.json": "{\"rules\":{\".read\": true}}" }, expect: "BLOCKED" },
+  "fb-testmode-date": { files: { "firestore.rules": "service cloud.firestore { match /databases/{db}/documents { match /{d=**} { allow read, write: if request.time < timestamp.date(2030, 1, 1); } } }\n" }, expect: "BLOCKED" },
+  // --- verify_jwt ---
+  "jwt-false": { files: { "supabase/config.toml": "[functions.admin]\nverify_jwt = false\n", "supabase/functions/admin/index.ts": "Deno.serve(() => new Response('ok'))\n" }, expect: "BLOCKED" },
+  "jwt-false-after-array": { files: { "supabase/config.toml": "[functions.admin]\nstatic_files = [ \"./x.html\" ]\nverify_jwt = false\n", "supabase/functions/admin/index.ts": "Deno.serve(() => new Response('ok'))\n" }, expect: "BLOCKED" },
+  "jwt-false-commented": { files: { "supabase/config.toml": "[functions.admin]\n# verify_jwt = false\nverify_jwt = true\n", "supabase/functions/admin/index.ts": "Deno.serve(() => new Response('ok'))\n" }, expect: "CLEAR" },
+  "jwt-false-quoted-name": { files: { "supabase/config.toml": "[functions.\"admin\"]\nverify_jwt = false\n", "supabase/functions/admin/index.ts": "Deno.serve(() => new Response('ok'))\n" }, expect: "BLOCKED" },
+  "jwt-false-sig-in-comment": { files: { "supabase/config.toml": "[functions.admin]\nverify_jwt = false\n", "supabase/functions/admin/index.ts": "// TODO: call stripe.webhooks.constructEvent( later\nDeno.serve(() => new Response('ok'))\n" }, expect: "BLOCKED" },
+  // --- webhook ---
+  "webhook-no-verify": { files: { "src/api/stripe-webhook.ts": "import Stripe from 'stripe'\nexport async function POST(req){ const event = await req.json(); if (event.type==='checkout.session.completed') grant(event) }\n" }, expect: "BLOCKED?" },
+  "webhook-route-no-webhook-name": { files: { "app/api/payments/route.ts": "import Stripe from 'stripe'\nexport async function POST(req){ const event = await req.json(); grant(event) }\n" }, expect: "BLOCKED?" },
+  "webhook-constructEvent-in-comment": { files: { "src/api/stripe-webhook.ts": "import Stripe from 'stripe'\n// we should use constructEvent here\nexport async function POST(req){ const event = await req.json(); grant(event) }\n" }, expect: "BLOCKED?" },
+  // --- skips ---
+  "skip-test-dir-real-route": { files: { "src/app/test/a.ts": "const k = process.env.NEXT_PUBLIC_OPENAI_API_KEY\n", "src/b.ts": "x" }, expect: "BLOCKED" },
+  "skip-build-dir": { files: { "build/a.ts": "const k = process.env.NEXT_PUBLIC_OPENAI_API_KEY\n", "src/b.ts": "x" }, expect: "?" },
+  "symlinked-dir": { files: { "real/a.ts": "const k = process.env.NEXT_PUBLIC_OPENAI_API_KEY\n" }, symlink: ["../real", "proj/src"], scanSub: "proj", expect: "BLOCKED" },
+  "only-go-code": { files: { "main.go": "package main\n", "README.md": "x" }, expect: "NOT CHECKED" },
+  "go-plus-package-json": { files: { "main.go": "package main // NEXT_PUBLIC_X_SECRET\n", "package.json": "{}" }, expect: "?" },
+};
+export { C as CANARY };

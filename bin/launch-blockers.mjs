@@ -15,9 +15,21 @@ const HELP = `launch-blockers ${VERSION}: the ways AI-built apps leak their user
   npx launch-blockers install --global   the same, for every project
   npx launch-blockers list               every pattern, with the incident behind it
 
-Exit codes for check: 0 CLEAR, 1 BLOCKED, 3 NOT CHECKED. Nothing is sent anywhere.`;
+Exit codes for check: 0 CLEAR, 1 BLOCKED, 3 NOT CHECKED, 2 a usage mistake or an error.
+Your code is read on this computer and never sent anywhere.`;
 
-const { values: opt, positionals } = parseArgs({ allowPositionals: true, options: { json: { type: "boolean" }, global: { type: "boolean" }, help: { type: "boolean", short: "h" }, version: { type: "boolean", short: "v" } } });
+// Exit 2 for a usage mistake or a crash, so it can never be read as 1 (BLOCKED) or 0 (CLEAR).
+process.on("uncaughtException", (e) => {
+  console.error(`launch-blockers: ${e?.message || e}`);
+  process.exit(2);
+});
+let opt, positionals;
+try {
+  ({ values: opt, positionals } = parseArgs({ allowPositionals: true, options: { json: { type: "boolean" }, global: { type: "boolean" }, help: { type: "boolean", short: "h" }, version: { type: "boolean", short: "v" } } }));
+} catch (e) {
+  console.error(`launch-blockers: ${e.message}\n\n${HELP}`);
+  process.exit(2);
+}
 const cmd = positionals[0];
 
 if (opt.version) console.log(VERSION);
@@ -31,7 +43,7 @@ else if (cmd === "check") {
   const { install } = await import("../src/install.mjs");
   try {
     const done = install({ global: opt.global, dir: positionals[1] || ".", version: VERSION });
-    console.log(`launch-blockers installed for Claude Code${opt.global ? " (every project)" : ""}:\n${done.map((d) => `  ${d}`).join("\n")}\n\nIn Claude Code, ask: "run the launch-blockers skill". Deploy commands are now checked first.\nClaude Code picks up the new setting by itself; /hooks shows it.`);
+    console.log(`launch-blockers installed for Claude Code${opt.global ? " (every project)" : ""}:\n${done.map((d) => `  ${d}`).join("\n")}\n\nDeploy commands are now checked first. If Claude Code is already open, restart it (or open /hooks) so it loads the guard.\nThen ask Claude: "run the launch-blockers skill".`);
   } catch (e) {
     console.error(`launch-blockers: ${e.message}`);
     process.exitCode = 2;

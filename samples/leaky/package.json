@@ -1,1 +1,1 @@
-{"name":"leaky","dependencies":{"@supabase/supabase-js":"2"}}
+{"name":"leaky","scripts":{"deploy":"vercel --prod"},"dependencies":{"@supabase/supabase-js":"2"}}
