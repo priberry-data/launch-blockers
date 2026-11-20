@@ -10,7 +10,7 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 6. [The Supabase service_role (secret) key in the browser](#6-service-role-in-frontend) · critical · found by `launch-blockers check`
 7. [The .env file committed to git](#7-env-committed) · high · found by `launch-blockers check`
 8. [A backend function anyone on the internet can call](#8-unauthenticated-function) · high · found by `launch-blockers check`
-9. [A payment webhook that believes anyone](#9-webhook-unverified) · medium · found by `launch-blockers check`
+9. [A payment webhook that believes anyone](#9-webhook-unverified) · high · found by `launch-blockers check`
 10. [An access check that's backwards or only in the browser](#10-backwards-access-check) · critical · reviewed by your agent (the skill)
 11. [Change the number in the address, see someone else's data](#11-other-users-records) · critical · reviewed by your agent (the skill)
 12. [A private app that still lets anyone sign up](#12-open-signup-private-app) · high · reviewed by your agent (the skill)
@@ -179,7 +179,7 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 <a id="9-webhook-unverified"></a>
 ## 9. A payment webhook that believes anyone
 
-**Severity:** medium · **Where:** Stripe, Lemon Squeezy, Paddle · **Detection:** found by `launch-blockers check` (Shown by the check, but doesn't block a deploy: the scan can't be sure (the check may live in another file).)
+**Severity:** high · **Where:** Stripe, Lemon Squeezy, Paddle · **Detection:** found by `launch-blockers check` (A Stripe handler in server code that acts on the request body with no constructEvent call is high and blocks a deploy. One where the scan cannot see the body being used is shown as a question, since the check may live in another file.)
 
 **What it looks like:** A Stripe webhook handler that parses the body and grants access without stripe.webhooks.constructEvent.
 

@@ -318,7 +318,7 @@
     {
       "id": "webhook-unverified",
       "title": "A payment webhook that believes anyone",
-      "severity": "medium",
+      "severity": "high",
       "platforms": [
         "Stripe",
         "Lemon Squeezy",
@@ -339,7 +339,7 @@
       "greenlit_ids": [
         "scan:webhook"
       ],
-      "detection_note": "Shown by the check, but doesn't block a deploy: the scan can't be sure (the check may live in another file)."
+      "detection_note": "A Stripe handler in server code that acts on the request body with no constructEvent call is high and blocks a deploy. One where the scan cannot see the body being used is shown as a question, since the check may live in another file."
     },
     {
       "id": "backwards-access-check",

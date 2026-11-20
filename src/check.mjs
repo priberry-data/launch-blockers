@@ -67,7 +67,14 @@ export function check(dir = ".") {
   notChecked.push({ pattern: "client-side-auth", what: "Who-can-see-what logic in your own code", how: "No pattern scan can judge this. The launch-blockers skill walks your agent through it." });
   if (scan.gitUnavailable) notChecked.push({ pattern: "env-committed", what: "Whether a .env file is committed", how: "This folder isn't a git repository (or git isn't installed), so tracked files couldn't be listed." });
 
+  // Other checkouts inside this one (git worktrees, submodules) are skipped as separate projects. One where the app's
+  // own code would live (supabase/, src/, app/...) is the app, so nothing was really checked.
+  const nested = scan.nested ?? [];
+  if (nested.length) notChecked.push({ pattern: "nested-checkout", what: `Separate checkouts inside this folder: ${nested.slice(0, 5).join(", ")}${nested.length > 5 ? ` and ${nested.length - 5} more` : ""}`, how: "Each is its own project. Run npx launch-blockers check inside any of them you deploy." });
+  const core = nested.filter((n) => /(^|\/)(supabase|src|app|migrations|functions|api|server|lib|pages|db|database|firebase)$/.test(n));
+
   const base = { schema: SCHEMA, dir: shown, files: scan.files };
+  if (core.length) return { ...base, status: "NOT CHECKED", reason: `${core.join(", ")} ${core.length > 1 ? "are separate checkouts" : "is a separate checkout"} (it has its own .git), so the app's code there wasn't read. Run the check inside it.`, blocking: [], other: [], ignored: [], notChecked };
   if (scan.files === 0) return { ...base, status: "NOT CHECKED", reason: "No code files were found here.", blocking: [], other: [], ignored: [], notChecked };
   // A partial read is not a clean read: say so instead of answering CLEAR for files that were never opened.
   if (scan.unread?.length) return { ...base, status: "NOT CHECKED", reason: `Some files that matter couldn't be read: ${scan.unread.slice(0, 5).join(", ")}${scan.unread.length > 5 ? ` and ${scan.unread.length - 5} more` : ""}.`, blocking: [], other: [], ignored: [], notChecked };

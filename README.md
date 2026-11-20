@@ -10,7 +10,7 @@ Built your app with Lovable, Bolt, v0, Replit, Cursor or Claude Code? These are 
 $ npx launch-blockers check
 launch-blockers · BLOCKED
 
-2 things to fix before you launch:
+3 things to fix before you launch:
 
 1. The secret VITE_OPENAI_API_KEY is named so it ships to the browser  [critical]
    src/ai.ts:1
@@ -18,6 +18,9 @@ launch-blockers · BLOCKED
 
 2. The table "profiles" is created without Row Level Security  [high]
    supabase/migrations/20260101_init.sql:1
+
+3. Anyone on the internet can read every row of "messages"  [high]
+   supabase/migrations/20260101_init.sql:4
 ```
 
 ## Start here
@@ -50,7 +53,7 @@ None of these needed a hacker. Each was one setting.
 | 6 | [The Supabase service_role (secret) key in the browser](PLAYBOOK.md#6-service-role-in-frontend) | critical | scan | Rule: Supabase docs: API keys |
 | 7 | [The .env file committed to git](PLAYBOOK.md#7-env-committed) | high | scan | 5,000+ GitHub repositories with OpenAI keys committed (2026-02) |
 | 8 | [A backend function anyone on the internet can call](PLAYBOOK.md#8-unauthenticated-function) | high | scan | Rule: Supabase docs: function configuration (verify_jwt) |
-| 9 | [A payment webhook that believes anyone](PLAYBOOK.md#9-webhook-unverified) | medium | scan | Rule: Stripe docs: verify webhook signatures |
+| 9 | [A payment webhook that believes anyone](PLAYBOOK.md#9-webhook-unverified) | high | scan | Rule: Stripe docs: verify webhook signatures |
 | 10 | [An access check that's backwards or only in the browser](PLAYBOOK.md#10-backwards-access-check) | critical | agent review | Lovable-showcased app with an inverted access check (2026-02) |
 | 11 | [Change the number in the address, see someone else's data](PLAYBOOK.md#11-other-users-records) | critical | agent review | Rule: OWASP API Security Top 10: API1 Broken Object Level Authorization |
 | 12 | [A private app that still lets anyone sign up](PLAYBOOK.md#12-open-signup-private-app) | high | agent review | Base44: anyone could join private apps (2025-07) |
