@@ -1,4 +1,4 @@
-# The 15 ways AI-built apps leak their users' data
+# The 18 ways AI-built apps leak their users' data
 
 Every pattern below is tied to a dated public incident or study, or to the platform's own official rule. Numbers are the source's own, and caveats are kept next to them. Last updated 2026-11-20. The same data is in [data/patterns.json](data/patterns.json).
 
@@ -17,6 +17,9 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 13. [An internal tool published to the open internet](#13-internal-tool-public) · high · reviewed by your agent (the skill)
 14. [Your coding agent can change the production database](#14-agent-can-write-production) · medium · found by `launch-blockers check`
 15. [The live database isn't what your files say](#15-live-db-differs) · high · only visible on the live app
+16. [The secret that signs logins is written into the code](#16-hardcoded-auth-secret) · high · found by `launch-blockers check`
+17. [A database rule trusts what users can change about themselves](#17-rls-user-metadata) · high · found by `launch-blockers check`
+18. [A view or database function that skips Row Level Security](#18-definer-skips-rls) · high · found by `launch-blockers check`
 
 <a id="1-no-rls"></a>
 ## 1. Database tables with no Row Level Security
@@ -42,9 +45,9 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 <a id="2-open-policy"></a>
 ## 2. Row Level Security is on, but the rule checks nothing
 
-**Severity:** high · **Where:** Supabase, Lovable, Bolt, v0, Replit · **Detection:** found by `launch-blockers check`
+**Severity:** high · **Where:** Supabase, Lovable, Bolt, v0, Replit · **Detection:** found by `launch-blockers check` (A rule that lets anyone (or any account) change or delete rows is high and blocks. A rule that lets anyone read a whole table blocks when the table holds something about people (profiles, messages, orders...); public lists like products are shown as a question.)
 
-**What it looks like:** create policy ... using (true), often added by an AI builder to make an error go away.
+**What it looks like:** create policy ... using (true), or a rule that only asks whether someone is signed in (auth.uid() is not null), often added by an AI builder to make an error go away.
 
 **Why it leaks:** RLS looks enabled in the dashboard, so everyone relaxes, but a condition of true lets everyone through. Fine for a product list, a leak for anything about people.
 
@@ -63,7 +66,7 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 
 **Severity:** critical · **Where:** Firebase, FlutterFlow, Replit, any app on Firestore · **Detection:** found by `launch-blockers check` (The scan catches if true and Firebase's test-mode rule. A rule that lets any signed-in user read everything (request.auth != null on its own) needs the skill's review.)
 
-**What it looks like:** allow read, write: if true; the test-mode rule allow read, write: if request.time < timestamp.date(...); or allow read: if request.auth != null with no owner check, which anyone who signs up passes.
+**What it looks like:** allow read, write: if true; an allow with no condition; test mode (request.time < timestamp.date(...)); or if request.auth != null on a catch-all {document=**} path.
 
 **Why it leaks:** Firebase's config is public by design. The rules are the only lock. Test mode is meant for the first 30 days and is often forgotten.
 
@@ -82,13 +85,13 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 <a id="4-public-storage"></a>
 ## 4. File storage anyone can read (ID photos, documents, uploads)
 
-**Severity:** critical · **Where:** Firebase Storage, Supabase Storage · **Detection:** found by `launch-blockers check` (Firebase storage.rules are scanned. Supabase buckets marked public in the dashboard aren't in your files: the skill asks your agent to list them.)
+**Severity:** critical · **Where:** Firebase Storage, Supabase Storage · **Detection:** found by `launch-blockers check` (Found in your files: buckets made public in a migration or supabase/config.toml, storage.objects policies with no owner check, and Firebase storage.rules. A bucket made public only in the dashboard isn't in your files: the skill asks your agent to list them. A public bucket whose name says it holds IDs or documents is critical; others (avatars, product photos) are shown as a question.)
 
-**What it looks like:** A storage bucket marked public, or allow read: if true in storage.rules, holding user uploads.
+**What it looks like:** insert into storage.buckets (..., public) values (..., true), [storage.buckets.x] public = true, a storage.objects policy using (true), or allow read: if true in storage.rules, holding user uploads.
 
 **Why it leaks:** Uploads are where the most sensitive things end up: selfies, IDs, contracts. A public bucket hands them to anyone who finds the address.
 
-**How to check:** launch-blockers check for storage.rules; for Supabase, list buckets and their public flag (Storage in the dashboard).
+**How to check:** launch-blockers check; for buckets made in the Supabase dashboard, list them and their public flag (Storage in the dashboard).
 
 **Fix prompt** (paste into Lovable, Bolt, Cursor, Claude Code or your builder):
 
@@ -101,13 +104,13 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 <a id="5-secret-in-frontend"></a>
 ## 5. A paid API key (OpenAI, Gemini, Stripe...) shipped in the browser code
 
-**Severity:** critical · **Where:** Vite, Next.js, Lovable, Bolt, v0, Expo · **Detection:** found by `launch-blockers check` (Keys behind a public prefix (VITE_, NEXT_PUBLIC_, EXPO_PUBLIC_...) are found by name. A key pasted straight into code shows up in the live app's JavaScript: npx greenlitlab <your-app>.)
+**Severity:** critical · **Where:** Vite, Next.js, Lovable, Bolt, v0, Expo · **Detection:** found by `launch-blockers check` (Found by name (VITE_, NEXT_PUBLIC_, EXPO_PUBLIC_... in front of a secret or a paid service's key), by shape (sk_live_, sk-proj-, sk-ant-, AKIA, ghp_ and other known key formats written into code, reported without the value), and by dangerouslyAllowBrowser: true. A Google AIza key is high in browser code of a project that uses Gemini, low otherwise.)
 
-**What it looks like:** VITE_OPENAI_API_KEY, NEXT_PUBLIC_STRIPE_SECRET_KEY, or a key pasted into a fetch() call in a component.
+**What it looks like:** VITE_OPENAI_API_KEY, NEXT_PUBLIC_STRIPE_SECRET_KEY, a key pasted into a fetch() call in a component, or new OpenAI({ dangerouslyAllowBrowser: true }).
 
 **Why it leaks:** Everything the browser runs, every visitor can read. A key there can be copied and used on your bill.
 
-**How to check:** launch-blockers check for public-prefixed names; npx greenlitlab <your-app> for keys in the deployed JavaScript.
+**How to check:** launch-blockers check; npx greenlitlab <your-app> for keys in the deployed JavaScript.
 
 **Fix prompt** (paste into Lovable, Bolt, Cursor, Claude Code or your builder):
 
@@ -117,17 +120,18 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 - **2026-02-12, About 3,000 websites exposing ChatGPT keys.** Cyble found about 3,000 public websites exposing ChatGPT API keys in client-side JavaScript. *(Cyble documents no measured bills for these keys.)* [Cyble](https://cyble.com/blog/when-ai-secrets-go-public-chatgpt/)
 - **2025-10-29, Escape.tech scan of 5,600+ vibe-coded apps.** Escape found more than 400 exposed secrets, over 2,000 vulnerabilities and 175 instances of exposed personal data across apps built on vibe-coding platforms. *(A vendor study by a company that sells scanning; it calls its numbers lower bounds.)* [Escape.tech](https://escape.tech/blog/methodology-how-we-discovered-vulnerabilities-apps-built-with-vibe-coding/)
 - **2026-02-01, Hardcoded secrets in Android AI apps.** Cybernews found nearly three-quarters of 38,630 Android apps with AI features had at least one hardcoded secret, 197,092 in all. *(Over 81% were Google Cloud identifiers, many low-risk.)* [TechRadar (reporting Cybernews)](https://www.techradar.com/pro/shock-report-claims-android-apps-have-leaked-over-730tb-of-user-data-and-google-secrets-here-are-some-of-the-worst-offenders-around)
+- **2026-02-25, Google API keys quietly became Gemini keys.** Truffle Security showed that switching on the Generative Language API in a Google Cloud project lets that project's existing API keys, including Maps and Firebase keys already published in websites' JavaScript, call Gemini with no warning. It found 2,863 live keys that worked on Gemini in one Common Crawl snapshot. *(The 2,863 keys are from across the web, not only AI-built apps. RedHunt Labs separately reported over 300 working Gemini keys on sites from vibe-coding platforms.)* [Truffle Security](https://trufflesecurity.com/blog/google-api-keys-werent-secrets-but-then-gemini-changed-the-rules)
 
 <a id="6-service-role-in-frontend"></a>
 ## 6. The Supabase service_role (secret) key in the browser
 
-**Severity:** critical · **Where:** Supabase · **Detection:** found by `launch-blockers check`
+**Severity:** critical · **Where:** Supabase · **Detection:** found by `launch-blockers check` (Found by name (a service_role key behind a public prefix), by value (a Supabase key whose role is service_role written into code, reported without the value), and by browser code that builds a Supabase client with the service-role key.)
 
 **What it looks like:** VITE_SUPABASE_SERVICE_ROLE_KEY, or createClient(url, serviceRoleKey) in a component.
 
 **Why it leaks:** The service_role key skips every Row Level Security rule. In the browser, it's the master key to the whole database.
 
-**How to check:** launch-blockers check finds it by name; npx greenlitlab <your-app> looks for it in the deployed JavaScript.
+**How to check:** launch-blockers check; npx greenlitlab <your-app> looks for it in the deployed JavaScript.
 
 **Fix prompt** (paste into Lovable, Bolt, Cursor, Claude Code or your builder):
 
@@ -265,7 +269,7 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 <a id="14-agent-can-write-production"></a>
 ## 14. Your coding agent can change the production database
 
-**Severity:** medium · **Where:** Claude Code, Cursor, Replit Agent, any MCP database server · **Detection:** found by `launch-blockers check` (A database MCP server without read-only mode is found in .mcp.json and similar files. Shown by the check, but doesn't block a deploy: the scan can't be sure (the check may live in another file).)
+**Severity:** medium · **Where:** Claude Code, Cursor, Replit Agent, any MCP database server · **Detection:** found by `launch-blockers check` (A database MCP server without read-only mode is found in .mcp.json, .cursor/mcp.json and similar files. Shown by the check, but doesn't block a deploy: the setting matters while you build, not to the deployed app.)
 
 **What it looks like:** A Supabase or Postgres MCP server in .mcp.json with write access, pointed at the live project.
 
@@ -279,6 +283,7 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 
 **On the record:**
 - **2025-07, Replit agent deletes a production database.** During a declared code freeze, Replit's AI agent deleted a live production database holding data on more than 1,200 executives and 1,190 companies. The data was recovered. *(Fortune published this on 23 Jul 2025; it gives no exact incident date.)* [Fortune](https://fortune.com/2025/07/23/ai-coding-tool-replit-wiped-database-called-it-a-catastrophic-failure/)
+- **2025-07-08, A support ticket makes an agent leak private tables through the Supabase MCP server.** General Analysis showed Cursor connected to the Supabase MCP server with the service_role key: an attacker's support ticket held instructions, and when the developer asked the agent to show the latest ticket, it read a private table of integration tokens and wrote them back into the ticket for the attacker to read. *(A demonstration, not a reported breach. Supabase has since added read-only and project-scoped modes.)* [General Analysis](https://www.generalanalysis.com/blog/supabase-mcp-blog)
 
 <a id="15-live-db-differs"></a>
 ## 15. The live database isn't what your files say
@@ -297,6 +302,61 @@ Every pattern below is tied to a dated public incident or study, or to the platf
 
 **On the record:**
 - **2026-11-04, Crissy Field scan of 159,041 Lovable projects.** 24,664 projects returned database records on page load to a visitor with no login, which is what the live database does, whatever the code says. [Techzine](https://www.techzine.eu/news/security/145550/thousands-of-lovable-apps-are-leaking-personal-data/)
+
+<a id="16-hardcoded-auth-secret"></a>
+## 16. The secret that signs logins is written into the code
+
+**Severity:** high · **Where:** Bolt, Replit, Cursor, Claude Code, any custom backend · **Detection:** found by `launch-blockers check` (Found when JWT_SECRET, SESSION_SECRET, SECRET_KEY and similar are set to a fixed value, or fall back to one when the environment variable is missing.)
+
+**What it looks like:** const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey", or JWT_SECRET: supersecretjwt in docker-compose.yml.
+
+**Why it leaks:** Whoever knows the secret that signs login tokens can make a valid token for any user, including an admin. A value in the code is known to everyone who has ever seen the code, and AI models reuse the same few values.
+
+**How to check:** launch-blockers check.
+
+**Fix prompt** (paste into Lovable, Bolt, Cursor, Claude Code or your builder):
+
+> Find every secret that signs logins, sessions or cookies in my project (JWT_SECRET, SESSION_SECRET, SECRET_KEY, NEXTAUTH_SECRET and similar). Don't show me the values. Make each one come only from an environment variable, make the app refuse to start if it is missing (no fallback value), and tell me how to generate a long random one. Then remind me that changing it signs everyone out.
+
+**On the record:**
+- **2025-11-05, Invicti: the same secrets across 20,656 AI-generated apps.** Invicti generated 20,656 web apps with leading AI models and found the string supersecretkey in 1,182 of them. In one, JWT_SECRET was set to supersecretjwt; with it, a researcher changed a token's role from customer to admin and reached the admin functions. *(Apps generated for the study, not live apps. It also found seeded logins such as admin@example.com with the password password.)* [Invicti](https://www.invicti.com/blog/security-labs/security-issues-in-vibe-coded-web-apps-analyzed)
+
+<a id="17-rls-user-metadata"></a>
+## 17. A database rule trusts what users can change about themselves
+
+**Severity:** high · **Where:** Supabase, Lovable, Bolt, v0 · **Detection:** found by `launch-blockers check`
+
+**What it looks like:** create policy ... using ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin').
+
+**Why it leaks:** Supabase's user_metadata is written by the user (supabase.auth.updateUser). A rule that checks it for a role can be passed by anyone who sets that role on their own account.
+
+**How to check:** launch-blockers check; Supabase's Security Advisor (Database → Advisors) flags it as an error.
+
+**Fix prompt** (paste into Lovable, Bolt, Cursor, Claude Code or your builder):
+
+> Find every Row Level Security policy in my database that reads user_metadata or raw_user_meta_data. Rewrite each one, as a new migration, to use app_metadata (which only the server can set) or a roles table that users can't write. Show me the SQL and how roles get assigned.
+
+**On the record:**
+- **Rule:** [Supabase Security Advisor: lint 0015, RLS references user metadata](https://supabase.com/docs/guides/database/database-linter?lint=0015_rls_references_user_metadata)
+
+<a id="18-definer-skips-rls"></a>
+## 18. A view or database function that skips Row Level Security
+
+**Severity:** high · **Where:** Supabase, Lovable, Bolt, v0 · **Detection:** found by `launch-blockers check` (Found in migrations: views without security_invoker (critical when they read auth.users), SECURITY DEFINER functions in the public schema that anon can still call (high when they run SQL built from text), and materialized views in the public schema.)
+
+**What it looks like:** create view public.leaderboard as select ... (no security_invoker), or create function public.exec_sql(q text) ... security definer ... execute q.
+
+**Why it leaks:** Views run with their creator's rights unless told otherwise, and a SECURITY DEFINER function runs with its owner's. Both skip the rules on the tables they read. In the public schema, the app's public key can reach them. Agents often add one to make a permissions error go away.
+
+**How to check:** launch-blockers check; Supabase's Security Advisor (Database → Advisors) flags these.
+
+**Fix prompt** (paste into Lovable, Bolt, Cursor, Claude Code or your builder):
+
+> List every view and SECURITY DEFINER function in my database's public schema. For each view, write a migration that sets security_invoker = on (or moves it out of public if it reads auth.users). For each function, revoke execute from public and anon unless it must be called without signing in, set search_path = '', and make it check auth.uid() itself. Remove any function that runs SQL passed in by the caller. Show me the SQL.
+
+**On the record:**
+- **Rule:** [Supabase Security Advisor: lint 0010, security definer view](https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view)
+- **Rule:** [Supabase Security Advisor: lint 0028, security definer function callable without signing in](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable)
 
 ---
 Found a pattern with a public source that isn't here? Open an issue with the link. Patterns are added only with a source anyone can read.

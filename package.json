@@ -1,6 +1,6 @@
 {
   "name": "launch-blockers",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The documented ways AI-built apps leak their users' data, each backed by a public incident or the platform's own rule, with a fix prompt, an agent skill that checks your project, and a guard that stops the deploy when it finds one.",
   "type": "module",
   "bin": {
@@ -24,7 +24,7 @@
     "site": "node scripts/build.mjs && node scripts/site.mjs"
   },
   "dependencies": {
-    "greenlitlab": "0.4.4"
+    "greenlitlab": "0.5.0"
   },
   "license": "Apache-2.0",
   "keywords": [

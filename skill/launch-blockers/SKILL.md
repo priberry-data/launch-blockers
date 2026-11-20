@@ -1,19 +1,20 @@
 ---
 name: launch-blockers
-description: Checks this project for the 15 documented ways AI-built apps leak their users' data, before launch or deploy. Use when the user is about to launch, deploy, publish or go live, or asks whether their app is safe, secure or ready.
+description: Checks this project for the 18 documented ways AI-built apps leak their users' data, before launch or deploy. Use when the user is about to launch, deploy, publish or go live, or asks whether their app is safe, secure or ready.
 ---
 
 # Launch blockers
 
-You're checking the user's own project for the 15 documented ways AI-built apps leak their users' data (github.com/priberry-data/launch-blockers). Work through all four steps, then report.
+You're checking the user's own project for the 18 documented ways AI-built apps leak their users' data (github.com/priberry-data/launch-blockers). Work through all four steps, then report.
 
 ## Rules
 - Never print, copy or log the value of a key, token or password. Refer to secrets by name only.
 - Change nothing in the live database, and run no deploy or migration, without the user's OK.
 - Only check apps the user owns. Never point any check at someone else's app.
+- Never create or edit `.launch-blockers-ignore` yourself, even to get a deploy through. Only the user can decide a finding is fine; if they do, tell them the exact line to add (the finding's id, then their reason) and let them add it.
 
 ## 1. Run the scan
-Run `npx -y launch-blockers@0.1.0 check --json` in the project root. It reads files on this computer only. The status is BLOCKED, CLEAR or NOT CHECKED. CLEAR covers only the patterns the scan knows; say so.
+Run `npx -y launch-blockers@0.2.0 check --json` in the project root. It reads files on this computer only. The status is BLOCKED, CLEAR or NOT CHECKED. CLEAR covers only the patterns the scan knows; say so.
 
 For each item in `blocking`, explain in one or two plain sentences what could leak and to whom, then offer to apply its `prompt` as the fix. Mention the `other` items briefly.
 
@@ -40,8 +41,13 @@ Builders publish to a public URL by default. A tool meant for five colleagues is
 
 What to do: This app is meant only for my team. Make every page and every data request require a signed-in user from an allowed list before anything loads, check that the published address shows nothing to a signed-out visitor, and tell me which visibility setting to change in my builder so it isn't public.
 
-## 3. The live app
-A file scan can't see the live database: rules changed in the Supabase or Firebase console never show up in files. Don't query the live database yourself. Tell the user to run `npx greenlitlab <their-app-url> --mine` on their own app; it counts which tables a stranger can read and never reads data.
+## 3. What lives in the dashboard
+Some settings are made in the Supabase or Firebase console and never appear in files. Ask the user to open these and tell you what they see (don't query the live project yourself):
+- **Storage buckets** (Supabase → Storage): which buckets are marked public, and what each holds. A public bucket of IDs, documents or private uploads is a leak (pattern: file storage anyone can read).
+- **Firebase rules** (Firestore, Storage and Realtime Database → Rules): whether the published rules match the rules file in the project, and whether any rule allows every signed-in user (`request.auth != null`) to read or write everything.
+- **Supabase Security Advisor** (Database → Advisors): any errors it lists.
+
+Then tell the user to run `npx greenlitlab <their-app-url> --mine` on their own app; it counts which tables a stranger can read and never reads data.
 
 ## 4. Report
-Finish with a short table: each of the 15 patterns, and whether it's blocked, clear, not applicable or not checked. Put anything blocked first, with the fix you propose. End with one line: what still can't be checked from here.
+Finish with a short table: each of the 18 patterns, and whether it's blocked, clear, not applicable or not checked. Put anything blocked first, with the fix you propose. End with one line: what still can't be checked from here.

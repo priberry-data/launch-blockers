@@ -1,10 +1,10 @@
 # Launch Blockers
 
-**The <!--n-->15<!--/n--> ways AI-built apps leak their users' data, each one on the public record, checked before you launch.**
+**The <!--n-->18<!--/n--> ways AI-built apps leak their users' data, each one on the public record, checked before you launch.**
 
 **[greenlit.priberry.com/blockers](https://greenlit.priberry.com/blockers/)**
 
-Built your app with Lovable, Bolt, v0, Replit, Cursor or Claude Code? These are the mistakes behind the leaks in the news: open databases, keys in the browser, Firebase left in test mode. Every pattern links to a dated public incident or the platform's own rule, comes with a fix prompt you paste into your builder, and has a check that runs before you deploy. (<!--mix-->11 from dated incidents or studies, 4 from the platform's own rules<!--/mix-->.)
+Built your app with Lovable, Bolt, v0, Replit, Cursor or Claude Code? These are the mistakes behind the leaks in the news: open databases, keys in the browser, Firebase left in test mode. Every pattern links to a dated public incident or the platform's own rule, comes with a fix prompt you paste into your builder, and has a check that runs before you deploy. (<!--mix-->12 from dated incidents or studies, 6 from the platform's own rules<!--/mix-->.)
 
 ```text
 $ npx launch-blockers check
@@ -57,6 +57,9 @@ None of these needed a hacker. Each was one setting.
 | 13 | [An internal tool published to the open internet](PLAYBOOK.md#13-internal-tool-public) | high | agent review | RedAccess: thousands of public vibe-coded apps with company data (2026-05) |
 | 14 | [Your coding agent can change the production database](PLAYBOOK.md#14-agent-can-write-production) | medium | scan | Replit agent deletes a production database (2025-07) |
 | 15 | [The live database isn't what your files say](PLAYBOOK.md#15-live-db-differs) | high | live check | Crissy Field scan of 159,041 Lovable projects (2026-11) |
+| 16 | [The secret that signs logins is written into the code](PLAYBOOK.md#16-hardcoded-auth-secret) | high | scan | Invicti: the same secrets across 20,656 AI-generated apps (2025-11) |
+| 17 | [A database rule trusts what users can change about themselves](PLAYBOOK.md#17-rls-user-metadata) | high | scan | Rule: Supabase Security Advisor: lint 0015, RLS references user metadata |
+| 18 | [A view or database function that skips Row Level Security](PLAYBOOK.md#18-definer-skips-rls) | high | scan | Rule: Supabase Security Advisor: lint 0010, security definer view |
 <!--/table-->
 
 Full detail, fix prompts and sources: **[PLAYBOOK.md](PLAYBOOK.md)**. Machine-readable: [data/patterns.json](data/patterns.json).
@@ -65,15 +68,18 @@ Full detail, fix prompts and sources: **[PLAYBOOK.md](PLAYBOOK.md)**. Machine-re
 
 `npx launch-blockers install` adds two things to your project's `.claude` folder:
 
-- **A skill** that walks your agent through all <!--n-->15<!--/n--> patterns, including the ones no scanner can judge (backwards access checks, other users' records, private apps with open sign-up).
-- **A guard** that runs before deploy commands (`vercel`, `netlify deploy`, `supabase db push`, `firebase deploy`, `wrangler deploy`, `fly deploy`, `railway up`, `npm run deploy`):
+- **A skill** that walks your agent through all <!--n-->18<!--/n--> patterns, including the ones no scanner can judge (backwards access checks, other users' records, private apps with open sign-up).
+- **A guard** that runs before deploy commands. It reads the command the way your shell will: `vercel`, `netlify deploy`, `supabase db push`, `firebase deploy`, `wrangler deploy`, `fly deploy`, `railway up` and about 30 more, including behind `npx`, `sudo`, `bash -c`, a shell script or an `npm run` script that deploys. A `git push` to main on a host that deploys from git asks you first, and so do MCP tools that deploy. It checks the folder being deployed, with the migrations at the top of its repository.
   - **BLOCKED:** the deploy is stopped and your agent gets the reasons and fix prompts.
   - **NOT CHECKED:** the check couldn't run, so you're asked. It never passes silently.
   - **CLEAR:** nothing changes; your usual approval still applies, with a note of what wasn't checked.
+  - If Claude Code can't ask you (bypass mode), anything that would ask is refused instead.
 
-Checked a finding yourself and it's fine (say, Row Level Security switched on in the dashboard)? Add its id and your reason to `.launch-blockers-ignore`. A line without a reason doesn't count, and ignored findings are always listed in the output.
+The guard carries its own copy of the check, so nothing is downloaded at deploy time and a package in your project's `node_modules` can't answer for it. If `node` can't run, the command is held rather than let through.
 
-Use `--global` to install for every project. The skill file works in any agent that reads skills; the deploy guard is for Claude Code today.
+Checked a finding yourself and it's fine (say, Row Level Security switched on in the dashboard)? Add its id and your reason to `.launch-blockers-ignore`. A line without a reason doesn't count. When a serious finding is ignored, you're asked before each deploy, with your reason shown. The skill tells your agent never to write that file itself.
+
+Use `--global` to install for every project. The skill is also written to `.agents/skills`, which Codex, Cursor, Gemini CLI and Copilot read; the deploy guard is for Claude Code today. Tested on macOS and Linux; Windows isn't verified yet.
 
 ## What it can't see
 
@@ -84,7 +90,7 @@ A file scan reads your files. It can't see:
 
 ## Privacy
 
-Everything runs on your computer. Nothing is uploaded. Names in `.env` files are read, never values.
+Everything runs on your computer. Nothing is uploaded, and nothing is downloaded when the guard runs. Names in `.env` files are read, never values. A key found in code is reported by its kind and line, never its value.
 
 ## Add a pattern
 

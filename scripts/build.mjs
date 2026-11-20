@@ -68,6 +68,7 @@ You're checking the user's own project for the ${N} documented ways AI-built app
 - Never print, copy or log the value of a key, token or password. Refer to secrets by name only.
 - Change nothing in the live database, and run no deploy or migration, without the user's OK.
 - Only check apps the user owns. Never point any check at someone else's app.
+- Never create or edit \`.launch-blockers-ignore\` yourself, even to get a deploy through. Only the user can decide a finding is fine; if they do, tell them the exact line to add (the finding's id, then their reason) and let them add it.
 
 ## 1. Run the scan
 Run \`npx -y launch-blockers@${VERSION} check --json\` in the project root. It reads files on this computer only. The status is BLOCKED, CLEAR or NOT CHECKED. CLEAR covers only the patterns the scan knows; say so.
@@ -79,7 +80,13 @@ For each of these, do the check yourself by reading the code, and report a clear
 
 ${review.map((p, i) => `### 2.${i + 1} ${p.title}\n${p.why}\n\nWhat to do: ${p.fix_prompt}`).join("\n\n")}
 
-## 3. The live app\nA file scan can't see the live database: rules changed in the Supabase or Firebase console never show up in files. Don't query the live database yourself. Tell the user to run \`npx greenlitlab <their-app-url> --mine\` on their own app; it counts which tables a stranger can read and never reads data.
+## 3. What lives in the dashboard
+Some settings are made in the Supabase or Firebase console and never appear in files. Ask the user to open these and tell you what they see (don't query the live project yourself):
+- **Storage buckets** (Supabase → Storage): which buckets are marked public, and what each holds. A public bucket of IDs, documents or private uploads is a leak (pattern: file storage anyone can read).
+- **Firebase rules** (Firestore, Storage and Realtime Database → Rules): whether the published rules match the rules file in the project, and whether any rule allows every signed-in user (\`request.auth != null\`) to read or write everything.
+- **Supabase Security Advisor** (Database → Advisors): any errors it lists.
+
+Then tell the user to run \`npx greenlitlab <their-app-url> --mine\` on their own app; it counts which tables a stranger can read and never reads data.
 
 ## 4. Report
 Finish with a short table: each of the ${N} patterns, and whether it's blocked, clear, not applicable or not checked. Put anything blocked first, with the fix you propose. End with one line: what still can't be checked from here.
