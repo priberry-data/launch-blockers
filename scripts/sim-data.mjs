@@ -15,6 +15,7 @@ patterns.forEach((p, i) => {
     why: p.why,
     fix: p.fix_prompt,
     anchor: `https://github.com/priberry-data/launch-blockers/blob/main/PLAYBOOK.md#${i + 1}-${p.id}`,
+    incidents: p.incidents.map((x) => ({ date: x.date, title: x.title, what: x.what, name: x.source_name, url: x.source_url, note: x.note || null })),
     source: inc ? { date: inc.date, title: inc.title, what: inc.what, name: inc.source_name, url: inc.source_url } : { date: null, title: p.rules[0].source_name, what: null, name: p.rules[0].source_name, url: p.rules[0].source_url },
   };
 });
