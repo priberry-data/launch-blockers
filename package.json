@@ -21,7 +21,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.mjs",
-    "site": "node scripts/build.mjs && node scripts/site.mjs"
+    "site": "node scripts/build.mjs && node scripts/site.mjs",
+    "sim": "node scripts/sim-data.mjs"
   },
   "dependencies": {
     "greenlitlab": "0.5.0"
