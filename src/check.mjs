@@ -3,7 +3,25 @@
 // and, just as important, says out loud what no file scan can see, so "CLEAR" never means more than it checked.
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { codeScan } from "./scan.mjs";
+
+// Findings whose leak the simulator plays get a link to a replay of exactly that leak, on a pretend app.
+// Keep SIMULATED in step with the switches in simulator/sim.js.
+const SIM = "https://greenlit.priberry.com/blockers/simulator/";
+const SIMULATED = new Set(["no-rls", "open-policy", "firebase-open-rules", "public-storage", "secret-in-frontend", "service-role-in-frontend", "env-committed", "unauthenticated-function", "webhook-unverified", "hardcoded-auth-secret", "rls-user-metadata", "definer-skips-rls"]);
+const REPLAY = (() => {
+  const map = { "lb:public-read": "open-policy" };
+  try {
+    const { patterns } = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "data", "patterns.json"), "utf8"));
+    for (const p of patterns) if (SIMULATED.has(p.id)) for (const g of p.greenlit_ids ?? []) map[g] ??= p.id;
+  } catch {}
+  return map;
+})();
+const replayOf = (id) => {
+  const pat = REPLAY[String(id).split(":").slice(0, 2).join(":")];
+  return pat ? `${SIM}#v=1&p=${pat}` : null;
+};
 
 // Anything this serious stops the deploy. Medium and low are shown but don't block.
 const BLOCKS = new Set(["critical", "high"]);
@@ -98,7 +116,7 @@ export function check(dir = ".") {
   for (const f of findings) {
     const rule = ignores.find((i) => i.id === f.id);
     if (rule) ignored.push({ ...f, reason: rule.reason });
-    else live.push(f);
+    else live.push({ ...f, replay: replayOf(f.id) });
   }
   const blocking = live.filter((f) => BLOCKS.has(f.severity));
   const other = live.filter((f) => !BLOCKS.has(f.severity));
@@ -114,7 +132,7 @@ export function render(r, { color = false } = {}) {
   if (r.reason) lines.push(`  ${r.reason}`, "");
   if (r.blocking.length) {
     lines.push(`${r.blocking.length} thing${r.blocking.length > 1 ? "s" : ""} to fix before you launch:`);
-    r.blocking.forEach((f, i) => lines.push(``, `${i + 1}. ${f.title}  [${f.severity}]`, `   ${f.where}`, `   ${f.why}`, `   Fix prompt for your builder:`, `   ${c("2", f.prompt)}`));
+    r.blocking.forEach((f, i) => lines.push(``, `${i + 1}. ${f.title}  [${f.severity}]`, `   ${f.where}`, `   ${f.why}`, `   Fix prompt for your builder:`, `   ${c("2", f.prompt)}`, ...(f.replay ? [`   Watch this leak happen on a pretend app: ${f.replay}`] : [])));
     lines.push("", `Checked one yourself and it's fine (say, RLS turned on in the dashboard)? Add a line to ${IGNORE_FILE}: its id from the list below, then why. Only a person should do this, never an agent.`, ...r.blocking.map((f) => `   ${f.id}`), "");
   } else if (r.status === "CLEAR") lines.push(`Nothing in the ${r.files} files read matches a known leak pattern.`, "");
   if (r.ignored?.length) lines.push(`Ignored by you in ${IGNORE_FILE}:`, ...r.ignored.map((f) => `  - ${f.title} (${f.id}): ${f.reason}`), "");
