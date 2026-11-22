@@ -47,6 +47,12 @@ export const cases = {
   "service-role-in-client-noprefix": { files: { "src/lib/supabase.ts": "'use client'\nimport { createClient } from '@supabase/supabase-js'\nexport const admin = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!)\n" }, expect: "BLOCKED" },
   "hardcoded-service-role-jwt": { files: { "src/lib/supabase.ts": `export const s = createClient("https://x.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.${C}")\n` }, expect: "BLOCKED" },
   "hardcoded-sk-live": { files: { "src/pay.ts": `const stripe = new Stripe("sk_live_${C}")\n` }, expect: "BLOCKED" },
+  "auth-secret-jwt-sign-literal": { files: { "server/auth.js": `import jwt from "jsonwebtoken";\nexport const sign = (u) => jwt.sign({ sub: u.id }, "supersecretkey");\n` }, expect: "BLOCKED" },
+  "auth-secret-jwt-verify-multiline": { files: { "server/auth.ts": `const user = jwt.verify(\n  token,\n  "my-dev-secret",\n  { algorithms: ["HS256"] }\n);\n` }, expect: "BLOCKED" },
+  "auth-secret-express-session": { files: { "server/app.js": `app.use(session({ resave: false, secret: "keyboard cat", saveUninitialized: true }));\n` }, expect: "BLOCKED" },
+  "auth-secret-flask-config": { files: { "app.py": `app.config["SECRET_KEY"] = "dev-secret-123"\n` }, expect: "BLOCKED" },
+  "auth-secret-jwt-sign-env-ok": { files: { "server/auth.js": `export const sign = (u) => jwt.sign({ sub: u.id, role: "user" }, process.env.JWT_SECRET, { expiresIn: "1h" });\n` }, expect: "CLEAR" },
+  "auth-secret-jwt-quoted-key-ok": { files: { "server/auth.js": `export const sign = (u) => jwt.sign({ "sub": u.id, "role": "user" }, key);\n` }, expect: "CLEAR" },
   "hardcoded-openai-sk-proj": { files: { "src/ai.ts": `const openai = new OpenAI({ apiKey: "sk-proj-${C}", dangerouslyAllowBrowser: true })\n` }, expect: "BLOCKED" },
   // --- env tracked ---
   "env-tracked-dotenv": { git: [".env"], files: { ".env": `SECRET=${C}\n`, "src/a.ts": "x" }, expect: "BLOCKED" },
