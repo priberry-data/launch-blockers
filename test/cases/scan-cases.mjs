@@ -23,6 +23,7 @@ export const cases = {
   "env-fixture-in-examples": { git: ["examples/lovable-supabase/.env.fixture", "examples/app/.env"], files: { "examples/lovable-supabase/.env.fixture": "SUPABASE_SERVICE_ROLE_KEY={{FAKE:service-role-jwt}}\n", "examples/app/.env": "OPENAI_API_KEY=${C}\n", "src/a.ts": "x" }, expect: "CLEAR" },
   "live-key-in-examples-still-counts": { files: { "src/a.ts": "x", "examples/shop/config.py": `STRIPE = 'sk_live_${C}'\n` }, expect: "BLOCKED" },
   "rls-supabase-folder-always": { files: { "supabase/migrations/001.sql": "create table public.profiles (id serial primary key, email text);\n-- AUTO_INCREMENT mentioned in a comment\n" }, expect: "BLOCKED" },
+  "view-invoker-no-value": { files: { "supabase/migrations/001.sql": T(RLS + "create view public.user_orders with (security_invoker) as select id from public.profiles;\n") }, expect: "CLEAR" },
   // --- open policies ---
   "policy-select-true-anon": { files: { "supabase/migrations/001.sql": T(RLS + "create policy \"read all\" on public.profiles for select to anon using (true);\n") }, expect: "BLOCKED" },
   "policy-all-true-spaces": { files: { "supabase/migrations/001.sql": T(RLS + "create policy p on public.profiles for all using (  TRUE  ) with check ( true );\n") }, expect: "BLOCKED" },
@@ -75,6 +76,7 @@ export const cases = {
   "env-tracked-lovable-default": { git: [".env"], files: { ".env": 'VITE_SUPABASE_PROJECT_ID="abcdefghijklmnop"\nVITE_SUPABASE_PUBLISHABLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiJ9.x"\nVITE_SUPABASE_URL="https://abcdefghijklmnop.supabase.co"\n', "src/a.ts": "x" }, expect: "CLEAR" },
   "env-tracked-empty-secret": { git: [".env"], files: { ".env": "OPENAI_API_KEY=\nVITE_SUPABASE_URL=https://x.supabase.co\n", "src/a.ts": "x" }, expect: "CLEAR" },
   "env-tracked-config-only": { git: [".env"], files: { ".env": "OLLAMA_LLM_MODEL=llama3\nDOCKER_BUILDKIT=1\n", "src/a.ts": "x" }, expect: "CLEAR" },
+  "env-tracked-public-prefix-only": { git: [".env"], files: { ".env": `VITE_EMAILJS_PUBLIC_KEY=abc123def456\nVITE_EMAILJS_SERVICE_ID=service_x\n`, "src/a.ts": "x" }, expect: "CLEAR" },
   "env-tracked-service-role": { git: [".env"], files: { ".env": `VITE_SUPABASE_URL=https://x.supabase.co\nSUPABASE_SERVICE_ROLE_KEY=${C}\n`, "src/a.ts": "x" }, expect: "BLOCKED" },
   "env-tracked-dev-vars": { git: [".dev.vars"], files: { ".dev.vars": `SECRET=${C}\n`, "src/a.ts": "x" }, expect: "BLOCKED" },
   "env-tracked-nested-local": { git: ["apps/web/.env.local"], files: { "apps/web/.env.local": `SECRET=${C}\n`, "src/a.ts": "x" }, expect: "BLOCKED" },
@@ -96,6 +98,7 @@ export const cases = {
   "jwt-false": { files: { "supabase/config.toml": "[functions.admin]\nverify_jwt = false\n", "supabase/functions/admin/index.ts": "Deno.serve(() => new Response('ok'))\n" }, expect: "BLOCKED" },
   "jwt-false-checks-user-in-code": { files: { "supabase/config.toml": "[functions.ai-chat]\nverify_jwt = false\n", "supabase/functions/ai-chat/index.ts": "Deno.serve(async (req) => {\n  const supabase = createClient(url, anon, { global: { headers: { Authorization: req.headers.get('Authorization')! } } });\n  const { data: { user } } = await supabase.auth.getUser();\n  if (!user) return new Response('no', { status: 401 });\n  return new Response('ok');\n});\n" }, expect: "CLEAR" },
   "jwt-false-getuser-only-in-comment": { files: { "supabase/config.toml": "[functions.admin]\nverify_jwt = false\n", "supabase/functions/admin/index.ts": "// TODO: call supabase.auth.getUser() here\nDeno.serve(() => new Response('ok'))\n" }, expect: "BLOCKED" },
+  "jwt-false-cron-secret": { files: { "supabase/config.toml": "[functions.reminders]\nverify_jwt = false\n", "supabase/functions/reminders/index.ts": "Deno.serve((req) => {\n  if (req.headers.get('x-cron-secret') !== Deno.env.get('CRON_SECRET')) return new Response('no', { status: 401 });\n  return new Response('ok');\n});\n" }, expect: "CLEAR" },
   "jwt-false-after-array": { files: { "supabase/config.toml": "[functions.admin]\nstatic_files = [ \"./x.html\" ]\nverify_jwt = false\n", "supabase/functions/admin/index.ts": "Deno.serve(() => new Response('ok'))\n" }, expect: "BLOCKED" },
   "jwt-false-commented": { files: { "supabase/config.toml": "[functions.admin]\n# verify_jwt = false\nverify_jwt = true\n", "supabase/functions/admin/index.ts": "Deno.serve(() => new Response('ok'))\n" }, expect: "CLEAR" },
   "jwt-false-quoted-name": { files: { "supabase/config.toml": "[functions.\"admin\"]\nverify_jwt = false\n", "supabase/functions/admin/index.ts": "Deno.serve(() => new Response('ok'))\n" }, expect: "BLOCKED" },
