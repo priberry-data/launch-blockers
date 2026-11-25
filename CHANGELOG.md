@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.2.1 (unreleased)
+
+- Uses greenlitlab 0.5.1: far fewer false alarms on real projects. It was hand-checked against public Lovable apps on GitHub, and 90% of the findings checked were real. See greenlitlab's changelog for each fix.
+- A login secret that only falls back to a fixed value when the environment variable is missing is reported as its own finding, linked to the same replay.
+
+## 0.2.0 (23 November 2026)
 
 Rebuilt after an adversarial audit (20 November 2026) that found about 60 ways to get a deploy past 0.1.0's guard. Every case is now a test.
 
