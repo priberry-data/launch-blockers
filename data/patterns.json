@@ -536,7 +536,8 @@
       ],
       "rules": [],
       "greenlit_ids": [
-        "scan:hardcoded-auth-secret"
+        "scan:hardcoded-auth-secret",
+        "scan:auth-secret-fallback"
       ]
     },
     {
