@@ -34,6 +34,7 @@ launch-blockers · BLOCKED
 
 ## Why this exists
 
+- **About 1 in 4** of 2,377 public Lovable projects on GitHub would ship a leak, by this check (weighted, ±3 points; a hand-check found a real leak in 33 of 36 flagged apps). No app is named ([the study](https://priberry.com/research/lovable-leaks/), Priberry, Dec 2026).
 - **1.5 million API tokens and 35,000 emails** sat in a vibe-coded app's database with Row Level Security never switched on (Moltbook, Feb 2026, [Wiz](https://www.wiz.io/blog/exposed-moltbook-database-reveals-millions-of-api-keys)).
 - **24,664 of 34,545** Lovable projects using Supabase returned database records to a visitor with no login (Crissy Field, Nov 2026; some of it may be meant to be public, [Techzine](https://www.techzine.eu/news/security/145550/thousands-of-lovable-apps-are-leaking-personal-data/)).
 - **About 300 million messages** were exposed by one Firebase misconfiguration in an AI chat app (Jan 2026, [404 Media](https://www.404media.co/massive-ai-chat-app-leaked-millions-of-users-private-conversations/)).
