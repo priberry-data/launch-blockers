@@ -4,6 +4,7 @@
 
 - Uses greenlitlab 0.5.1: far fewer false alarms on real projects. It was hand-checked against public Lovable apps on GitHub, and 90% of the findings checked were real. See greenlitlab's changelog for each fix.
 - A login secret that only falls back to a fixed value when the environment variable is missing is reported as its own finding, linked to the same replay.
+- A table anyone can read in full is a blocker when its name is sensitive (messages, payments, patients, documents, credentials and the like) or it has personal columns (email, phone, address, date of birth). Supabase's starter policy that makes profiles with only a username and avatar readable by everyone is now a note, not a blocker. When a table's columns aren't in the repo, a name like profiles still blocks.
 
 ## 0.2.0 (23 November 2026)
 
