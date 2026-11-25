@@ -72,6 +72,7 @@ export const cases = {
   "public-secret-after-url-in-code": { files: { "src/ai.ts": "const r = await fetch('https://api.openai.com/v1', { headers: { Authorization: import.meta.env.VITE_OPENAI_API_KEY } });\n" }, expect: "BLOCKED" },
   "auth-secret-name-as-json-value": { files: { "server/catalog.json": "{ \"secrets\": [ { \"env\": \"APP_SECRET\", \"bytes\": 32, \"encoding\": \"hex\" } ] }\n" }, expect: "CLEAR" },
   "auth-secret-getenv-default": { files: { "app/config.py": `SECRET = os.environ.get("JWT_SECRET", "${C}")\n` }, expect: "BLOCKED" },
+  "auth-secret-literal-flask": { files: { "backend/app.py": `app.config["SECRET_KEY"] = "${C}"\n` }, expect: "BLOCKED" },
   "auth-secret-env-fallback": { files: { "server/auth.js": `const JWT_SECRET = process.env.JWT_SECRET || "${C}";\n` }, expect: "BLOCKED" },
   "env-tracked-lovable-default": { git: [".env"], files: { ".env": 'VITE_SUPABASE_PROJECT_ID="abcdefghijklmnop"\nVITE_SUPABASE_PUBLISHABLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiJ9.x"\nVITE_SUPABASE_URL="https://abcdefghijklmnop.supabase.co"\n', "src/a.ts": "x" }, expect: "CLEAR" },
   "env-tracked-empty-secret": { git: [".env"], files: { ".env": "OPENAI_API_KEY=\nVITE_SUPABASE_URL=https://x.supabase.co\n", "src/a.ts": "x" }, expect: "CLEAR" },
