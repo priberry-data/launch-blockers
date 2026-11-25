@@ -27,7 +27,11 @@ const replayOf = (id) => {
 const BLOCKS = new Set(["critical", "high"]);
 export const SCHEMA = 2;
 // A table that holds something about a person. Reading all of it, with no login, is the leak in the news.
-const PEOPLE = /(^|_)(users?|profiles?|accounts?|customers?|members?|messages?|chats?|conversations?|orders?|payments?|invoices?|subscriptions?|contacts?|leads?|patients?|bookings?|appointments?|addresses|emails?|phones?|employees?|students?|applications?|applicants?|candidates?|documents?|uploads?|notes?|comments?|reviews?|sessions?|tokens?|keys?|secrets?|credentials?|passwords?|wallets?|transactions?|referrals?|signups?|waitlists?|registrations?|tickets?|feedback|surveys?|responses?|submissions?|kyc|verifications?|identities|ids|medical|health|records?|guests?|attendees?|clients?|tenants?|parents?|children|kids|drivers?|riders?|staff|teams?|organizations?|orgs?|companies)(_|$)/i;
+// Names that are sensitive whatever their columns: messages, payments, health records, documents, credentials.
+const SENSITIVE = /(^|_)(messages?|chats?|conversations?|payments?|invoices?|orders?|transactions?|patients?|medical|health_records?|appointments?|bookings?|addresses|documents?|uploads?|notes?|secrets?|credentials?|passwords?|(api|access|refresh|auth)_?(keys?|tokens?)|sessions?|kyc|verifications?|identities|applications?|applicants?|candidates?|employees?|submissions?|contacts?|leads?|emails?|phones?|tickets?)(_|$)/i;
+// Names that often hold people, but are also often public on purpose (Supabase's own starter makes profiles readable by
+// everyone). These block when the table has personal columns (email, phone, address...) or when its columns aren't in the repo.
+const PEOPLE = /(^|_)(users?|profiles?|accounts?|customers?|members?|subscriptions?|students?|comments?|reviews?|wallets?|referrals?|signups?|waitlists?|registrations?|feedback|surveys?|responses?|kyc|records?|guests?|attendees?|clients?|tenants?|parents?|children|kids|drivers?|riders?|staff|teams?|organizations?|orgs?|companies|health|ids)(_|$)/i;
 
 function listFiles(root, max = 4000) {
   const skip = new Set(["node_modules", ".git", "dist", "build", ".next", ".vercel", ".netlify", ".wrangler", "coverage"]);
@@ -101,7 +105,7 @@ export function check(dir = ".") {
   const findings = [];
   for (const f of scan.findings) {
     if (f.id === "scan:public-read:everyone" && Array.isArray(f.tables)) {
-      const people = f.tables.filter((t) => PEOPLE.test(t.table) || t.people);
+      const people = f.tables.filter((t) => SENSITIVE.test(t.table) || t.people || (PEOPLE.test(t.table) && t.known !== true));
       const rest = f.tables.filter((t) => !people.includes(t));
       for (const t of people)
         findings.push({ id: `lb:public-read:${t.table}`, severity: "high", where: t.where, title: `Anyone on the internet can read every row of "${t.table}"`, why: `A Row Level Security policy on "${t.table}" lets everyone read with the condition true, and the table looks like it holds information about people. This is the leak in CVE-2025-48757 and in the Moltbook incident.`, fix: "Limit reads to the row's owner (auth.uid() = the owner column), or to signed-in users who need it.", first: null, prompt: `In my database, the table "${t.table}" has a Row Level Security policy that lets anyone read every row (the condition is true). Tell me what personal information it holds. Then write a new migration that replaces that policy so a user can only read their own rows (auth.uid() = the owner column; add one if needed), or, if some fields must be public, move them to a separate public table or view. Don't edit old migrations. Show me the SQL.` });
